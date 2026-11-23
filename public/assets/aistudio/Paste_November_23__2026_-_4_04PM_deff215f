@@ -1,0 +1,654 @@
+document.addEventListener('DOMContentLoaded', () => {
+  'use strict';
+
+  /* ================= Helpers ================= */
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+  const safe = (el, fn) => { if (el && typeof fn === 'function') fn(el); };
+  const val = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+
+  const state = { lang: 'en', theme: 'auto' };
+
+  /* ================= TRANSLATIONS ================= */
+  const I18N = {
+    en: {
+      brand_tag: 'Rwanda CBC Teaching Assistant',
+      open_workspace: 'Open Workspace',
+      hero_badge: 'Aligned with REB Competence-Based Curriculum',
+      hero_title_1: 'Plan smarter.', hero_title_2: 'Teach better.',
+      hero_sub: 'Generate CBC-compliant lesson plans, assessments and teaching methodologies in English, Kinyarwanda or French — plus an always-on teaching assistant.',
+      cta_lesson: 'Create a Lesson', cta_assistant: 'Ask the Assistant',
+      stat_langs: 'Languages', stat_tools: 'AI Tools', stat_levels: 'All Levels',
+      how_title: 'How it works', how_sub: 'From blank page to classroom-ready in three steps.',
+      step1_t: 'Describe your class', step1_d: 'Pick the subject, class level (P1–S6), unit, topic and lesson duration.',
+      step2_t: 'Generate with AI', step2_d: 'GHAD AI drafts a CBC-compliant plan, assessment or methodology instantly.',
+      step3_t: 'Teach & refine', step3_d: 'Copy, edit and adapt the output. Ask the assistant anything, anytime.',
+      tools_title: 'Your teaching toolkit', tools_sub: 'Four purpose-built tools, one workspace.', open: 'Open →',
+      tool_lesson_t: 'Lesson Planner', tool_lesson_d: 'Full REB CBC lesson plans in the official competence-based format.',
+      tool_assess_t: 'Assessment Builder', tool_assess_d: 'Quizzes, exams and formative checks at any difficulty level.',
+      tool_method_t: 'Methodology Guide', tool_method_d: 'Learner-centred teaching strategies tailored to your topic.',
+      tool_ai_t: 'AI Assistant', tool_ai_d: 'Ask questions, get explanations and classroom ideas in seconds.',
+      trust_1: 'Built for Rwandan schools', trust_2: 'Official REB CBC format', trust_3: '3 languages, one click', trust_4: 'Your data stays yours',
+      footer_line: "Built for Rwanda's teachers. Aligned with REB CBC.", footer_rights: 'All rights reserved.',
+      back_home: 'Back to Home',
+      nav_dashboard: 'Dashboard', nav_lesson: 'Lesson Planner', nav_assistant: 'Assistant',
+      nav_assessment: 'Assessment', nav_methodology: 'Methodology', nav_resources: 'Resources', nav_settings: 'Settings',
+      lang_label: 'Language', theme_label: 'Theme',
+      theme_auto: 'Auto', theme_light: 'Light', theme_dark: 'Dark',
+      dash_title: 'Welcome back 👋', dash_sub: 'Choose a tool to get started.',
+      dash_lesson_d: 'Build REB CBC lesson plans.', dash_ai_d: 'Ask anything, anytime.',
+      dash_assess_d: 'Generate quizzes & tests.', dash_method_d: 'Learner-centred strategies.',
+      dash_res_d: 'Curriculum materials.', dash_set_d: 'Language & theme.',
+      lesson_title: 'Lesson Planner', lesson_sub: 'Generate an official REB CBC competence-based lesson plan.',
+      f_subject: 'Subject', f_class: 'Class', f_topic: 'Topic', f_duration: 'Duration (min)',
+      f_unit: 'Unit', f_learners: 'Learners', f_extra: 'Extra instructions',
+      btn_lesson: 'Generate Lesson Plan', btn_assess: 'Generate Assessment', btn_method: 'Generate Methodology',
+      out_lesson: 'Lesson Plan', out_assess: 'Assessment', out_method: 'Methodology',
+      copy: 'Copy', print: 'Print / PDF',
+      assistant_title: 'Teaching Assistant', assistant_sub: 'Ask anything about teaching the CBC.',
+      chat_welcome: "Hello! I'm your GHAD AI assistant. How can I help with your lesson today?",
+      chat_ph: 'Type your question…', send: 'Send',
+      assess_title: 'Assessment Builder', assess_sub: 'Create quizzes and tests aligned to your topic.',
+      f_questions: 'Questions', f_difficulty: 'Difficulty', f_type: 'Type',
+      diff_easy: 'Easy', diff_medium: 'Medium', diff_hard: 'Hard',
+      type_mcq: 'Multiple Choice', type_short: 'Short Answer', type_mixed: 'Mixed',
+      method_title: 'Methodology Guide', method_sub: 'Get learner-centred teaching strategies.',
+      res_title: 'Resources', res_sub: 'Useful links for Rwandan teachers.',
+      settings_title: 'Settings', settings_sub: 'Personalise your workspace.', settings_lang: 'Preferred language',
+      // REB CBC table labels
+      cbc_school: 'School Name', cbc_teacher: 'Teacher Names', cbc_term: 'Term', cbc_year: 'Year',
+      cbc_subject: 'Subject', cbc_class: 'Class / Stream', cbc_unit: 'Unit No', cbc_lessonno: 'Lesson No',
+      cbc_duration: 'Duration', cbc_size: 'Class Size', cbc_sen: 'Type of Special Educational Needs',
+      cbc_competence: 'Key Unit Competence', cbc_title: 'Title of the Lesson', cbc_date: 'Date', cbc_period: 'Period',
+      cbc_stages: 'Stages / Timing', cbc_desc: 'Description of teaching and learning activity',
+      cbc_generic: 'Generic Competences & Cross-Cutting Issues', cbc_instr: 'Teacher Instruction / Notes',
+      cbc_stage_intro: 'Introduction', cbc_stage_body: 'Development / Body of the Lesson', cbc_stage_concl: 'Conclusion & Assessment',
+      cbc_teacher_act: 'Teacher activities', cbc_learner_act: 'Learner activities',
+      toast_copied: 'Copied to clipboard!', toast_copy_fail: 'Copy failed — please copy manually',
+      toast_fill: 'Please fill subject, class and topic', toast_net: 'Failed: network error',
+      toast_lesson: 'Lesson plan generated', toast_assess: 'Assessment generated', toast_method: 'Methodology generated',
+      toast_busy: '⏳ Generating…'
+    },
+    rw: {
+      brand_tag: 'Umufasha w\'umwigisha wa CBC u Rwanda',
+      open_workspace: 'Fungura Urubuga',
+      hero_badge: 'Ihuza n\'Inyigisho zibanze za REB (CBC)',
+      hero_title_1: 'Tegeka neza.', hero_title_2: 'Igisha neza.',
+      hero_sub: 'Kora amayerige y\'isomo, ibipimo n\'uburyo bwo kwigisha bihuza CBC mu Kinyarwanda, Cyongereza cyangwa Igifaransa — ufite umufasha uba ahari buri gihe.',
+      cta_lesson: 'Kora Isomo', cta_assistant: 'Baza Umufasha',
+      stat_langs: 'Indimi', stat_tools: 'Ibikoresho by\'AI', stat_levels: 'Amashuri yose',
+      how_title: 'Ni iyihe kora', how_sub: 'Kuva ku ntoki kugera mu isomo mu ntambwe eshatu.',
+      step1_t: 'Sobanura ishuri ryawe', step1_d: 'Hitamo isomo, urwego (P1–S6), igice, insanganyamatsiko n\'igihe.',
+      step2_t: 'Kora ubwoko bwa AI', step2_d: 'GHAD AI yandika ubutumwa buhuza CBC ako kanya.',
+      step3_t: 'Igisha & kunoza', step3_d: 'Koporora, hindura kandi uwinjize. Baza umufasha igihe cyose.',
+      tools_title: 'Ibikoresho byawe byo kwigisha', tools_sub: 'Ibikoresho bine byubatswe neza, urubuga rumwe.', open: 'Fungura →',
+      tool_lesson_t: 'Mugenga w\'Isomo', tool_lesson_d: 'Amayerige y\'isomo ya REB CBC mu nyandiko ishimwe.',
+      tool_assess_t: 'Mubaka w\'Ibipimo', tool_assess_d: 'Ibazarwa, ibizamini n\'ibipimo ku rwego urwo arirwo ruse.',
+      tool_method_t: 'Inyandiko y\'Uburyo', tool_method_d: 'Uburyo bwo kwigisha bwibanda ku mugeni.',
+      tool_ai_t: 'Umufasha wa AI', tool_ai_d: 'Baza ibibazo, habwa ibisobanuro mu amasekonda.',
+      trust_1: 'Byubatswe kw\'amashuri y\'u Rwanda', trust_2: 'Imiterere ya REB CBC', trust_3: 'Indimi eshatu, kanda rimwe', trust_4: 'Amakuru yawe aguma ari yawe',
+      footer_line: 'Byubatswe abigisha b\'u Rwanda. Bihuye na REB CBC.', footer_rights: 'Uburenganzira bwose burafitwe.',
+      back_home: 'Subira Ku Ntoki',
+      nav_dashboard: 'Imbonerahamwe', nav_lesson: 'Mugenga w\'Isomo', nav_assistant: 'Umufasha',
+      nav_assessment: 'Ibipimo', nav_methodology: 'Uburyo', nav_resources: 'Ibikoresho', nav_settings: 'Igenamiterere',
+      lang_label: 'Ururimi', theme_label: 'Imiterere',
+      theme_auto: 'Nyamwiherere', theme_light: 'Umucyo', theme_dark: 'Umwijima',
+      dash_title: 'Murakaza neza 👋', dash_sub: 'Hitamo igikoresho utangire.',
+      dash_lesson_d: 'Kora amayerige ya REB CBC.', dash_ai_d: 'Baza igihe cyose.',
+      dash_assess_d: 'Kora ibazarwa n\'ibizamini.', dash_method_d: 'Uburyo bwibanda ku mugeni.',
+      dash_res_d: 'Ibikoresho by\'inyigisho.', dash_set_d: 'Ururimi & imiterere.',
+      lesson_title: 'Mugenga w\'Isomo', lesson_sub: 'Kora inyandiko y\'isomo ya REB CBC.',
+      f_subject: 'Isomo', f_class: 'Icyiciro', f_topic: 'Insanganyamatsiko', f_duration: 'Igihe (iminota)',
+      f_unit: 'Igice', f_learners: 'Abanyeshuri', f_extra: 'Amabwiriza ayimaze',
+      btn_lesson: 'Kora Igeza ry\'Isomo', btn_assess: 'Kora Ikipimo', btn_method: 'Kora Uburyo',
+      out_lesson: 'Igeza ry\'Isomo', out_assess: 'Ikipimo', out_method: 'Uburyo',
+      copy: 'Koporora', print: 'Kubona / PDF',
+      assistant_title: 'Umufasha w\'Kwigisha', assistant_sub: 'Baza ikibazo cyose kijyanye na CBC.',
+      chat_welcome: 'Muraho! Ndi umufasha wawe wa GHAD AI. Nabafasha iki ku isomo ryanyu uyu munsi?',
+      chat_ph: 'Andika ikibazo cyawe…', send: 'Ohereza',
+      assess_title: 'Mubaka w\'Ibipimo', assess_sub: 'Kora ibazarwa bihuye n\'insanganyamatsiko.',
+      f_questions: 'Ibibazo', f_difficulty: 'Ikomeye', f_type: 'Ubwoko',
+      diff_easy: 'Byoroshye', diff_medium: 'Hagati', diff_hard: 'Bikomeye',
+      type_mcq: 'Hitamo Igisubizo', type_short: 'Igisubizo Gike', type_mixed: 'Cyavuyemo',
+      method_title: 'Inyandiko y\'Uburyo', method_sub: 'Habwa uburyo bwibanda ku mugeni.',
+      res_title: 'Ibikoresho', res_sub: 'Amahuza angirakamaraka abigisha.',
+      settings_title: 'Igenamiterere', settings_sub: 'Tunganya urubuga rwawe.', settings_lang: 'Ururimi rwawe',
+      cbc_school: 'Izina ry\'Ishuri', cbc_teacher: 'Amazina y\'Umwigisha', cbc_term: 'Igihe', cbc_year: 'Umwaka',
+      cbc_subject: 'Isomo', cbc_class: 'Icyiciro', cbc_unit: 'Igice No', cbc_lessonno: 'Isomo No',
+      cbc_duration: 'Igihe', cbc_size: 'Umubare w\'Abanyeshuri', cbc_sen: 'Ubwoko bw\'Ikeno Cyangwa Idini',
+      cbc_competence: 'Ubushobozi bw\'Igice', cbc_title: 'Umutwe w\'Isomo', cbc_date: 'Itariki', cbc_period: 'Igihe cy\'Isomo',
+      cbc_stages: 'Intambwe / Igihe', cbc_desc: 'Ibikorwa byo kwigisha no kwigishirwa',
+      cbc_generic: 'Ubushobozi Rusange & Ibibanjira', cbc_instr: 'Ibigisha Umwigisha / Icyitonderwa',
+      cbc_stage_intro: 'Intangiro', cbc_stage_body: 'Umutwe w\'Isomo', cbc_stage_concl: 'Umwanzuro & Ikipimo',
+      cbc_teacher_act: 'Ibikorwa by\'umwigisha', cbc_learner_act: 'Ibikorwa by\'abanyeshuri',
+      toast_copied: 'Byakopiwe!', toast_copy_fail: 'Koporora byaranze — koporora wenyine',
+      toast_fill: 'Uzuza isomo, icyiciro n\'insanganyamatsiko', toast_net: 'Byaranze: amakuru yabaye ikibazo',
+      toast_lesson: 'Igeza ry\'isomo ryakozwe', toast_assess: 'Ikipimo cyakozwe', toast_method: 'Uburyo bwakozwe',
+      toast_busy: '⏳ Birimo gukorwa…'
+    },
+    fr: {
+      brand_tag: 'Assistant pédagogique CBC du Rwanda',
+      open_workspace: 'Ouvrir l\'Espace',
+      hero_badge: 'Aligné sur le curriculum CBC du REB',
+      hero_title_1: 'Planifiez mieux.', hero_title_2: 'Enseignez mieux.',
+      hero_sub: 'Générez des plans de leçon, évaluations et méthodologies conformes au CBC en anglais, kinyarwanda ou français — avec un assistant toujours disponible.',
+      cta_lesson: 'Créer une Leçon', cta_assistant: 'Demander l\'Assistant',
+      stat_langs: 'Langues', stat_tools: 'Outils IA', stat_levels: 'Tous niveaux',
+      how_title: 'Comment ça marche', how_sub: 'De la page blanche à la classe, en trois étapes.',
+      step1_t: 'Décrivez votre classe', step1_d: 'Choisissez la matière, le niveau (P1–S6), l\'unité, le sujet et la durée.',
+      step2_t: 'Générez avec l\'IA', step2_d: 'GHAD AI rédige un plan conforme au CBC instantanément.',
+      step3_t: 'Enseignez & affinez', step3_d: 'Copiez, modifiez et adaptez. Posez vos questions à tout moment.',
+      tools_title: 'Votre boîte à outils', tools_sub: 'Quatre outils dédiés, un seul espace.', open: 'Ouvrir →',
+      tool_lesson_t: 'Planificateur de Leçon', tool_lesson_d: 'Plans de leçon REB CBC au format officiel par compétences.',
+      tool_assess_t: 'Créateur d\'Évaluation', tool_assess_d: 'Quiz, examens et évaluations formatives à tout niveau.',
+      tool_method_t: 'Guide Méthodologique', tool_method_d: 'Stratégies centrées sur l\'apprenant, adaptées à votre sujet.',
+      tool_ai_t: 'Assistant IA', tool_ai_d: 'Posez des questions, obtenez des explications en quelques secondes.',
+      trust_1: 'Conçu pour les écoles rwandaises', trust_2: 'Format officiel REB CBC', trust_3: '3 langues, un clic', trust_4: 'Vos données restent les vôtres',
+      footer_line: 'Conçu pour les enseignants du Rwanda. Aligné sur le REB CBC.', footer_rights: 'Tous droits réservés.',
+      back_home: 'Retour à l\'Accueil',
+      nav_dashboard: 'Tableau de bord', nav_lesson: 'Planificateur', nav_assistant: 'Assistant',
+      nav_assessment: 'Évaluation', nav_methodology: 'Méthodologie', nav_resources: 'Ressources', nav_settings: 'Paramètres',
+      lang_label: 'Langue', theme_label: 'Thème',
+      theme_auto: 'Auto', theme_light: 'Clair', theme_dark: 'Sombre',
+      dash_title: 'Bon retour 👋', dash_sub: 'Choisissez un outil pour commencer.',
+      dash_lesson_d: 'Créez des plans REB CBC.', dash_ai_d: 'Posez vos questions.',
+      dash_assess_d: 'Générez quiz et tests.', dash_method_d: 'Stratégies centrées apprenant.',
+      dash_res_d: 'Supports du curriculum.', dash_set_d: 'Langue & thème.',
+      lesson_title: 'Planificateur de Leçon', lesson_sub: 'Générez un plan de leçon officiel REB CBC par compétences.',
+      f_subject: 'Matière', f_class: 'Classe', f_topic: 'Sujet', f_duration: 'Durée (min)',
+      f_unit: 'Unité', f_learners: 'Apprenants', f_extra: 'Instructions supplémentaires',
+      btn_lesson: 'Générer le Plan de Leçon', btn_assess: 'Générer l\'Évaluation', btn_method: 'Générer la Méthodologie',
+      out_lesson: 'Plan de Leçon', out_assess: 'Évaluation', out_method: 'Méthodologie',
+      copy: 'Copier', print: 'Imprimer / PDF',
+      assistant_title: 'Assistant Pédagogique', assistant_sub: 'Posez toutes vos questions sur le CBC.',
+      chat_welcome: 'Bonjour ! Je suis votre assistant GHAD AI. Comment puis-je aider votre leçon aujourd\'hui ?',
+      chat_ph: 'Tapez votre question…', send: 'Envoyer',
+      assess_title: 'Créateur d\'Évaluation', assess_sub: 'Créez des quiz alignés à votre sujet.',
+      f_questions: 'Questions', f_difficulty: 'Difficulté', f_type: 'Type',
+      diff_easy: 'Facile', diff_medium: 'Moyen', diff_hard: 'Difficile',
+      type_mcq: 'Choix Multiple', type_short: 'Réponse Courte', type_mixed: 'Mixte',
+      method_title: 'Guide Méthodologique', method_sub: 'Obtenez des stratégies centrées sur l\'apprenant.',
+      res_title: 'Ressources', res_sub: 'Liens utiles pour les enseignants.',
+      settings_title: 'Paramètres', settings_sub: 'Personnalisez votre espace.', settings_lang: 'Langue préférée',
+      cbc_school: 'Nom de l\'École', cbc_teacher: 'Noms de l\'Enseignant', cbc_term: 'Trimestre', cbc_year: 'Année',
+      cbc_subject: 'Matière', cbc_class: 'Classe / Groupe', cbc_unit: 'Unité N°', cbc_lessonno: 'Leçon N°',
+      cbc_duration: 'Durée', cbc_size: 'Effectif de la Classe', cbc_sen: 'Type de Besoins Éducatifs Spéciaux',
+      cbc_competence: 'Compétence Clé de l\'Unité', cbc_title: 'Titre de la Leçon', cbc_date: 'Date', cbc_period: 'Période',
+      cbc_stages: 'Étapes / Durée', cbc_desc: 'Description des activités d\'enseignement et d\'apprentissage',
+      cbc_generic: 'Compétences Génériques & Thèmes Transversaux', cbc_instr: 'Instructions de l\'Enseignant / Remarques',
+      cbc_stage_intro: 'Introduction', cbc_stage_body: 'Développement / Corps de la Leçon', cbc_stage_concl: 'Conclusion & Évaluation',
+      cbc_teacher_act: 'Activités de l\'enseignant', cbc_learner_act: 'Activités des apprenants',
+      toast_copied: 'Copié dans le presse-papiers !', toast_copy_fail: 'Échec de la copie — copiez manuellement',
+      toast_fill: 'Veuillez remplir matière, classe et sujet', toast_net: 'Échec : erreur réseau',
+      toast_lesson: 'Plan de leçon généré', toast_assess: 'Évaluation générée', toast_method: 'Méthodologie générée',
+      toast_busy: '⏳ Génération…'
+    }
+  };
+  const langName = { en: 'English', rw: 'Kinyarwanda', fr: 'French' };
+
+  function applyI18n() {
+    const dict = I18N[state.lang] || I18N.en;
+    $$('[data-i18n]').forEach((el) => {
+      const key = el.getAttribute('data-i18n');
+      if (Object.prototype.hasOwnProperty.call(dict, key)) el.textContent = dict[key];
+    });
+    $$('[data-i18n-ph]').forEach((el) => {
+      const key = el.getAttribute('data-i18n-ph');
+      if (Object.prototype.hasOwnProperty.call(dict, key)) el.setAttribute('placeholder', dict[key]);
+    });
+    document.documentElement.lang = state.lang;
+  }
+
+  function tr(key) {
+    const dict = I18N[state.lang] || I18N.en;
+    return Object.prototype.hasOwnProperty.call(dict, key) ? dict[key] : (I18N.en[key] || key);
+  }
+
+  /* ================= Toasts ================= */
+  function toast(msg, type) {
+    const container = $('#toastContainer');
+    if (!container) return;
+    const t = document.createElement('div');
+    t.className = 'toast' + (type ? ' ' + type : '');
+    t.textContent = msg;
+    container.appendChild(t);
+    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 350); }, 3200);
+  }
+
+  /* ================= View switching ================= */
+  const VIEWS = ['dashboard', 'lesson', 'assistant', 'assessment', 'methodology', 'resources', 'settings'];
+
+  function showView(name) {
+    if (!VIEWS.includes(name)) name = 'dashboard';
+    $$('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + name));
+    $$('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
+    const ws = $('#workspaceApp');
+    if (ws) ws.classList.remove('sidebar-open');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function openWorkspace(viewName) {
+    const landing = $('#landingPage');
+    const workspace = $('#workspaceApp');
+    if (landing) landing.hidden = true;
+    if (workspace) { workspace.hidden = false; workspace.style.display = 'flex'; }
+    showView(viewName || 'dashboard');
+  }
+
+  function goHome() {
+    const landing = $('#landingPage');
+    const workspace = $('#workspaceApp');
+    if (workspace) workspace.hidden = true;
+    if (landing) { landing.hidden = false; window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  }
+
+  /* ================= Language / Theme ================= */
+  function setLang(lang) {
+    if (!['en', 'rw', 'fr'].includes(lang)) lang = 'en';
+    state.lang = lang;
+    ['landingLangSelect', 'langSelect', 'settingsLang'].forEach((id) => {
+      const sel = document.getElementById(id);
+      if (sel) sel.value = lang;
+    });
+    applyI18n();
+    try { localStorage.setItem('ghad_lang', lang); } catch (_) {}
+  }
+
+  function setTheme(theme) {
+    if (!['auto', 'light', 'dark'].includes(theme)) theme = 'auto';
+    state.theme = theme;
+    document.documentElement.setAttribute('data-theme', theme);
+    ['themeSelect', 'settingsTheme'].forEach((id) => {
+      const sel = document.getElementById(id);
+      if (sel) sel.value = theme;
+    });
+    try { localStorage.setItem('ghad_theme', theme); } catch (_) {}
+  }
+
+  safe($('#landingLangSelect'), (el) => el.addEventListener('change', () => setLang(el.value)));
+  safe($('#langSelect'), (el) => el.addEventListener('change', () => setLang(el.value)));
+  safe($('#settingsLang'), (el) => el.addEventListener('change', () => setLang(el.value)));
+  safe($('#themeSelect'), (el) => el.addEventListener('change', () => setTheme(el.value)));
+  safe($('#settingsTheme'), (el) => el.addEventListener('change', () => setTheme(el.value)));
+
+  /* ================= Launch / navigation ================= */
+  $$('[data-launch]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      openWorkspace(el.getAttribute('data-launch'));
+    });
+  });
+  $$('.nav-btn[data-view], .feature-card[data-view]').forEach((el) => {
+    el.addEventListener('click', () => showView(el.getAttribute('data-view')));
+  });
+  safe($('#backToHomeBtn'), (el) => el.addEventListener('click', goHome));
+  safe($('#menuToggle'), (el) =>
+    el.addEventListener('click', () => {
+      const ws = $('#workspaceApp');
+      if (ws) ws.classList.toggle('sidebar-open');
+    })
+  );
+  safe($('#footerYear'), (el) => { el.textContent = String(new Date().getFullYear()); });
+
+  /* ================= 3D tilt + parallax orbs ================= */
+  if (!window.matchMedia('(hover: none)').matches) {
+    $$('[data-tilt]').forEach((card) => {
+      const max = 10;
+      card.addEventListener('pointermove', (e) => {
+        const r = card.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        const px = (e.clientX - r.left) / r.width - 0.5;
+        const py = (e.clientY - r.top) / r.height - 0.5;
+        card.style.transform =
+          'perspective(900px) rotateY(' + (px * max).toFixed(2) + 'deg) rotateX(' +
+          (-py * max).toFixed(2) + 'deg) translateZ(8px)';
+      });
+      card.addEventListener('pointerleave', () => { card.style.transform = ''; });
+    });
+    window.addEventListener('pointermove', (e) => {
+      const cx = e.clientX / window.innerWidth - 0.5;
+      const cy = e.clientY / window.innerHeight - 0.5;
+      $$('.orb').forEach((orb, i) => {
+        const depth = (i + 1) * 18;
+        orb.style.transform = 'translate(' + (-cx * depth).toFixed(1) + 'px,' + (-cy * depth).toFixed(1) + 'px)';
+      });
+    });
+  }
+
+  /* ================= Copy helper ================= */
+  function copyText(text, okMsg) {
+    const done = () => toast(okMsg || tr('toast_copied'), 'success');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else fallbackCopy(text, done);
+  }
+  function fallbackCopy(text, done) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove(); done();
+    } catch (_) { toast(tr('toast_copy_fail'), 'error'); }
+  }
+
+  /* ================= API helper ================= */
+  async function postJSON(url, payload) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Server error (' + res.status + ')');
+    const data = await res.json();
+    if (typeof data === 'string') return data;
+    return data.output || data.result || data.text || data.message || data.content ||
+      data.lesson || data.assessment || data.methodology || data.reply || data.answer ||
+      JSON.stringify(data, null, 2);
+  }
+
+  /* ================= Markdown-ish table detection & rendering ================= */
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function mdTablesToHtml(text) {
+    const lines = String(text).split('\n');
+    let html = '', i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      // detect a markdown table: | a | b | ... followed by | --- | --- |
+      if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+        const parseRow = (l) => l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+        const headers = parseRow(line);
+        i += 2;
+        const rows = [];
+        while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+          rows.push(parseRow(lines[i]));
+          i++;
+        }
+        html += '<table><thead><tr>' +
+          headers.map((h) => '<th>' + inlineMd(h) + '</th>').join('') + '</tr></thead><tbody>' +
+          rows.map((r) => '<tr>' + r.map((c) => '<td>' + inlineMd(c) + '</td>').join('') + '</tr>').join('') +
+          '</tbody></table>';
+        continue;
+      }
+      html += inlineMd(line) + '\n';
+      i++;
+    }
+    return html;
+  }
+
+  function inlineMd(s) {
+    return esc(s)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/^### (.*)$/, '<h3 class="cbc-heading">$1</h3>')
+      .replace(/^## (.*)$/, '<h3 class="cbc-heading">$1</h3>')
+      .replace(/^# (.*)$/, '<h3 class="cbc-heading">$1</h3>');
+  }
+
+  /* ================= REB CBC lesson plan renderer ================= */
+  function renderCbcLessonPlan(rawText, form) {
+    const body = document.getElementById('lessonBody');
+    if (!body) return;
+    const t = (k) => tr(k);
+
+    const infoRows = [
+      [t('cbc_school'), form.school || '____________________'],
+      [t('cbc_teacher'), form.teacher || '____________________'],
+      [t('cbc_term'), form.term || '______', t('cbc_year'), form.year || '______'],
+      [t('cbc_subject'), form.subject, t('cbc_class'), form.klass],
+      [t('cbc_unit'), form.unit || '______', t('cbc_lessonno'), '______'],
+      [t('cbc_duration'), form.duration + ' min', t('cbc_size'), form.learners],
+      [t('cbc_sen'), form.sen || 'None'],
+      [t('cbc_date'), form.date || '____ / ____ / ______', t('cbc_period'), '______']
+    ];
+
+    const stages = [
+      [t('cbc_stage_intro'), form.intro || '', ''],
+      [t('cbc_stage_body'), form.body || '', ''],
+      [t('cbc_stage_concl'), form.concl || '', '']
+    ];
+
+    const aiHtml = mdTablesToHtml(rawText);
+
+    body.innerHTML =
+      '<div class="cbc-doc">' +
+      '<h3 class="cbc-heading">' + esc(t('cbc_title')) + ': ' + esc(form.topic) + '</h3>' +
+      '<table>' + infoRows.map((r) =>
+        '<tr>' + r.map((c) => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('') + '</table>' +
+      '<h3 class="cbc-heading">' + esc(t('cbc_competence')) + '</h3>' +
+      '<p>' + esc(form.competence || '—') + '</p>' +
+      '<h3 class="cbc-heading">' + esc(t('cbc_stages')) + '</h3>' +
+      '<table class="stages"><thead><tr>' +
+      '<th>' + esc(t('cbc_stages')) + '</th>' +
+      '<th>' + esc(t('cbc_desc')) + '</th>' +
+      '<th>' + esc(t('cbc_generic')) + '</th>' +
+      '</tr></thead><tbody>' +
+      stages.map((s) =>
+        '<tr><td>' + esc(s[0]) + '</td><td>' + (s[1] ? mdTablesToHtml(s[1]) : '—') + '</td><td>' + esc(s[2] || '—') + '</td></tr>'
+      ).join('') + '</tbody></table>' +
+      '<h3 class="cbc-heading">' + esc(t('cbc_teacher_act')) + ' / ' + esc(t('cbc_learner_act')) + ' (AI)</h3>' +
+      aiHtml +
+      '</div>';
+  }
+
+  /* ================= Output rendering ================= */
+  function renderResult(outId, bodyId, copyBtnId, text) {
+    const out = document.getElementById(outId);
+    const body = document.getElementById(bodyId);
+    if (!out || !body) return;
+    body.innerHTML = '<pre class="cbc-raw">' + esc(text) + '</pre>';
+    out.classList.remove('hidden');
+    body.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const btn = document.getElementById(copyBtnId);
+    if (btn) btn.onclick = () => copyText(text, tr('toast_copied'));
+    out.dataset.raw = text;
+  }
+
+  function setLoading(btn, busy, busyText) {
+    if (!btn) return;
+    if (busy) {
+      btn.dataset.original = btn.textContent;
+      btn.textContent = busyText || tr('toast_busy');
+      btn.disabled = true;
+    } else {
+      btn.textContent = btn.dataset.original || 'Generate';
+      btn.disabled = false;
+    }
+  }
+
+  /* ================= Prompt template (REB CBC format) ================= */
+  const CBC_PROMPT = [
+    'You are an expert Rwandan CBC (Competence-Based Curriculum) teacher-trainer.',
+    'Write the response in {LANG}.',
+    'Produce a COMPLETE competence-based lesson plan following the official REB / elearning.reb.rw format:',
+    '1) Basic information: School name, Teacher names, Term, Year, Subject, Class/Stream, Unit No, Lesson No, Duration, Class size, Type of special educational needs, Date, Period.',
+    '2) Key Unit Competence.',
+    '3) Title of the lesson.',
+    '4) A table with columns: Stages/Timing | Description of teaching and learning activity | Generic competences and cross-cutting issues.',
+    '   Stages must include: Introduction (refer back to prior knowledge, link to daily life, introduction of the new lesson),',
+    '   Development/Body (presentation of the lesson content with teacher activities AND learner activities, group work, discovery),',
+    '   Conclusion/Assessment (summary, formative assessment exercises, marks and remarks).',
+    '5) Include specific competences, generic competences, cross-cutting issues, teaching materials and references.',
+    'Use markdown tables so the output can be rendered as a table. Be professional, realistic and complete — the teacher will submit this document.'
+  ].join('\n');
+
+  /* ================= Lesson generator ================= */
+  safe($('#generateLesson'), (btn) => {
+    btn.addEventListener('click', async () => {
+      const form = {
+        subject: val('lessonSubject'), klass: val('lessonClass'), topic: val('lessonTopic'),
+        duration: val('lessonDuration') || '40', unit: val('lessonUnit'),
+        learners: val('lessonLearners') || '40', extra: val('lessonExtra'),
+        school: '', teacher: '', term: '', year: '', date: '', sen: '', competence: ''
+      };
+      if (!form.subject || !form.klass || !form.topic) {
+        toast(tr('toast_fill'), 'error');
+        return;
+      }
+      setLoading(btn, true);
+      try {
+        const payload = {
+          language: state.lang, langName: langName[state.lang],
+          subject: form.subject, class: form.klass, topic: form.topic,
+          duration: form.duration, unit: form.unit, learners: form.learners, extra: form.extra,
+          prompt: CBC_PROMPT.replace('{LANG}', langName[state.lang]) +
+            '\nSubject: ' + form.subject + '\nClass: ' + form.klass + '\nTopic: ' + form.topic +
+            '\nUnit: ' + (form.unit || 'N/A') + '\nDuration: ' + form.duration + ' minutes' +
+            '\nNumber of learners: ' + form.learners +
+            (form.extra ? '\nExtra instructions: ' + form.extra : '')
+        };
+        const text = await postJSON('/api/lesson', payload);
+        renderCbcLessonPlan(text, form);
+        const out = document.getElementById('lessonOutput');
+        if (out) out.dataset.raw = text;
+        document.getElementById('lessonOutput').classList.remove('hidden');
+        toast(tr('toast_lesson'), 'success');
+      } catch (err) {
+        toast((tr('toast_net')) + (err && err.message ? ' — ' + err.message : ''), 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+  });
+
+  /* ================= Print / PDF for lesson ================= */
+  safe($('#printLesson'), (btn) => {
+    btn.addEventListener('click', () => window.print());
+  });
+
+  /* ================= Chat assistant ================= */
+  function addChatMsg(role, text) {
+    const box = $('#chatMessages');
+    if (!box) return null;
+    const div = document.createElement('div');
+    div.className = 'chat-msg ' + (role === 'user' ? 'user' : 'bot');
+    div.textContent = text;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+    return div;
+  }
+
+  async function sendChat() {
+    const input = $('#chatInput');
+    const btn = $('#sendChat');
+    if (!input) return;
+    const text = (input.value || '').trim();
+    if (!text) return;
+    addChatMsg('user', text);
+    input.value = '';
+    const thinking = addChatMsg('bot', '…');
+    if (btn) btn.disabled = true;
+    try {
+      const reply = await postJSON('/api/assistant', {
+        language: state.lang, langName: langName[state.lang], message: text
+      });
+      if (thinking && thinking.parentNode) thinking.remove();
+      addChatMsg('bot', reply);
+    } catch (_) {
+      if (thinking && thinking.parentNode) thinking.remove();
+      addChatMsg('bot', '⚠️ ' + tr('toast_net'));
+    } finally {
+      if (btn) btn.disabled = false;
+      input.focus();
+    }
+  }
+
+  safe($('#sendChat'), (btn) => btn.addEventListener('click', sendChat));
+  safe($('#chatInput'), (input) =>
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+    })
+  );
+
+  /* ================= Assessment generator ================= */
+  safe($('#generateAssessment'), (btn) => {
+    btn.addEventListener('click', async () => {
+      const payload = {
+        language: state.lang, langName: langName[state.lang],
+        subject: val('assessSubject'), class: val('assessClass'), topic: val('assessTopic'),
+        count: val('assessCount') || '5', difficulty: val('assessDifficulty') || 'medium',
+        type: val('assessType') || 'mcq'
+      };
+      if (!payload.subject || !payload.class || !payload.topic) {
+        toast(tr('toast_fill'), 'error');
+        return;
+      }
+      setLoading(btn, true);
+      try {
+        const text = await postJSON('/api/assessment', payload);
+        const out = document.getElementById('assessmentOutput');
+        const body = document.getElementById('assessmentBody');
+        if (out && body) {
+          body.innerHTML = mdTablesToHtml(text);
+          out.classList.remove('hidden');
+          out.dataset.raw = text;
+        }
+        toast(tr('toast_assess'), 'success');
+      } catch (err) {
+        toast((tr('toast_net')) + (err && err.message ? ' — ' + err.message : ''), 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+  });
+  safe($('#copyAssessment'), (btn) => {
+    btn.addEventListener('click', () => {
+      const out = document.getElementById('assessmentOutput');
+      if (out && out.dataset.raw) copyText(out.dataset.raw, tr('toast_copied'));
+    });
+  });
+
+  /* ================= Methodology generator ================= */
+  safe($('#generateMethodology'), (btn) => {
+    btn.addEventListener('click', async () => {
+      const payload = {
+        language: state.lang, langName: langName[state.lang],
+        subject: val('methodSubject'), class: val('methodClass'), topic: val('methodTopic')
+      };
+      if (!payload.subject || !payload.class || !payload.topic) {
+        toast(tr('toast_fill'), 'error');
+        return;
+      }
+      setLoading(btn, true);
+      try {
+        const text = await postJSON('/api/methodology', payload);
+        const out = document.getElementById('methodologyOutput');
+        const body = document.getElementById('methodologyBody');
+        if (out && body) {
+          body.innerHTML = mdTablesToHtml(text);
+          out.classList.remove('hidden');
+          out.dataset.raw = text;
+        }
+        toast(tr('toast_method'), 'success');
+      } catch (err) {
+        toast((tr('toast_net')) + (err && err.message ? ' — ' + err.message : ''), 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+  });
+  safe($('#copyMethodology'), (btn) => {
+    btn.addEventListener('click', () => {
+      const out = document.getElementById('methodologyOutput');
+      if (out && out.dataset.raw) copyText(out.dataset.raw, tr('toast_copied'));
+    });
+  });
+  safe($('#copyLesson'), (btn) => {
+    btn.addEventListener('click', () => {
+      const out = document.getElementById('lessonOutput');
+      if (out && out.dataset.raw) copyText(out.dataset.raw, tr('toast_copied'));
+    });
+  });
+
+  /* ================= Init (restore saved prefs) ================= */
+  try {
+    const savedLang = localStorage.getItem('ghad_lang');
+    const savedTheme = localStorage.getItem('ghad_theme');
+    if (savedLang) setLang(savedLang); else applyI18n();
+    if (savedTheme) setTheme(savedTheme);
+  } catch (_) {
+    applyI18n();
+  }
+});

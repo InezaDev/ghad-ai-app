@@ -1,0 +1,415 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ==================== GLOBAL HELPERS ====================
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isSignedIn() &&
+        request.auth.uid == userId &&
+        request.auth.token.email_verified == true;
+    }
+
+    function hasValidParentUser(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId)) &&
+        get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+    }
+
+    function isValidLang(val) {
+      return val is string && val.size() <= 5 && val in ['en', 'rw', 'fr'];
+    }
+
+    function isValidTheme(val) {
+      return val is string && val.size() <= 10 && val in ['auto', 'light', 'dark'];
+    }
+
+    function isValidTerm(val) {
+      return val is string && val.size() <= 20 && val in ['Term 1', 'Term 2', 'Term 3'];
+    }
+
+    // ==================== ENTITY VALIDATORS ====================
+    function isValidUserAccount(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'displayName', 'createdAt', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        data.uid == request.auth.uid &&
+        data.displayName is string && data.displayName.size() <= 120 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidPrivateProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid', 'email', 'schoolName', 'teacherName',
+          'defaultTerm', 'lang', 'theme', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'uid', 'email', 'schoolName', 'teacherName',
+          'defaultTerm', 'lang', 'theme', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        data.uid == request.auth.uid &&
+        data.email is string && data.email.size() <= 254 &&
+        data.schoolName is string && data.schoolName.size() <= 160 &&
+        data.teacherName is string && data.teacherName.size() <= 120 &&
+        isValidTerm(data.defaultTerm) &&
+        isValidLang(data.lang) &&
+        isValidTheme(data.theme) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidLessonPlanContent(p) {
+      return p is map &&
+        p.keys().hasAll([
+          'schoolName', 'teacherName', 'term', 'date', 'subject', 'classLevel',
+          'unitNo', 'lessonNo', 'durationMinutes', 'classSize', 'sen', 'unitTitle',
+          'keyUnitCompetence', 'lessonTitle', 'instructionalObjective',
+          'planLocation', 'learningMaterials', 'references', 'activityOverview',
+          'stages', 'teacherSelfEvaluation'
+        ]) &&
+        p.keys().hasOnly([
+          'schoolName', 'teacherName', 'term', 'date', 'subject', 'classLevel',
+          'unitNo', 'lessonNo', 'durationMinutes', 'classSize', 'sen', 'unitTitle',
+          'keyUnitCompetence', 'lessonTitle', 'instructionalObjective',
+          'planLocation', 'learningMaterials', 'references', 'activityOverview',
+          'stages', 'teacherSelfEvaluation'
+        ]) &&
+        p.schoolName is string && p.schoolName.size() <= 160 &&
+        p.teacherName is string && p.teacherName.size() <= 120 &&
+        p.term is string && p.term.size() <= 40 &&
+        p.date is string && p.date.size() <= 40 &&
+        p.subject is string && p.subject.size() <= 120 &&
+        p.classLevel is string && p.classLevel.size() <= 40 &&
+        p.unitNo is string && p.unitNo.size() <= 40 &&
+        p.lessonNo is string && p.lessonNo.size() <= 40 &&
+        p.durationMinutes is number && p.durationMinutes >= 1 && p.durationMinutes <= 360 &&
+        p.classSize is string && p.classSize.size() <= 40 &&
+        p.sen is string && p.sen.size() <= 1000 &&
+        p.unitTitle is string && p.unitTitle.size() <= 500 &&
+        p.keyUnitCompetence is string && p.keyUnitCompetence.size() <= 2000 &&
+        p.lessonTitle is string && p.lessonTitle.size() <= 500 &&
+        p.instructionalObjective is string && p.instructionalObjective.size() <= 2000 &&
+        p.planLocation is string && p.planLocation.size() <= 200 &&
+        p.learningMaterials is string && p.learningMaterials.size() <= 2000 &&
+        p.references is string && p.references.size() <= 2000 &&
+        p.activityOverview is string && p.activityOverview.size() <= 3000 &&
+        p.teacherSelfEvaluation is string && p.teacherSelfEvaluation.size() <= 2000 &&
+        p.stages is list && p.stages.size() <= 15 &&
+        (p.stages.size() == 0 || (
+          p.stages[0] is map &&
+          p.stages[0].stageType is string && p.stages[0].stageType.size() <= 30 &&
+          p.stages[0].stageName is string && p.stages[0].stageName.size() <= 120 &&
+          p.stages[0].timingMinutes is number
+        ));
+    }
+
+    function isValidSavedPlan(data, userId, planId) {
+      return data.keys().hasAll([
+          'id', 'uid', 'language', 'createdAtIso', 'updatedAtIso', 'plan', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'uid', 'language', 'createdAtIso', 'updatedAtIso', 'plan', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        data.id == planId &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        data.uid == request.auth.uid &&
+        isValidLang(data.language) &&
+        data.createdAtIso is string && data.createdAtIso.size() <= 40 &&
+        data.updatedAtIso is string && data.updatedAtIso.size() <= 40 &&
+        isValidLessonPlanContent(data.plan) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidChatThread(data, userId, chatId) {
+      return data.keys().hasAll([
+          'id', 'uid', 'title', 'createdAtIso', 'updatedAtIso', 'messages', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'uid', 'title', 'createdAtIso', 'updatedAtIso', 'messages', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        data.id == chatId &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        data.uid == request.auth.uid &&
+        data.title is string && data.title.size() <= 200 &&
+        data.createdAtIso is string && data.createdAtIso.size() <= 40 &&
+        data.updatedAtIso is string && data.updatedAtIso.size() <= 40 &&
+        data.messages is list && data.messages.size() <= 100 &&
+        (data.messages.size() == 0 || (
+          data.messages[0] is map &&
+          data.messages[0].id is string && data.messages[0].id.size() <= 128 &&
+          data.messages[0].role is string && data.messages[0].role in ['user', 'bot'] &&
+          data.messages[0].text is string && data.messages[0].text.size() <= 20000
+        )) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAssessmentContent(d) {
+      return d is map &&
+        d.keys().hasAll(['title', 'instructions', 'totalMarks', 'questions']) &&
+        d.keys().hasOnly(['title', 'instructions', 'totalMarks', 'questions']) &&
+        d.title is string && d.title.size() <= 300 &&
+        d.instructions is string && d.instructions.size() <= 2000 &&
+        d.totalMarks is number && d.totalMarks >= 0 && d.totalMarks <= 1000 &&
+        d.questions is list && d.questions.size() <= 40 &&
+        (d.questions.size() == 0 || (
+          d.questions[0] is map &&
+          d.questions[0].question is string && d.questions[0].question.size() <= 3000
+        ));
+    }
+
+    function isValidSavedAssessment(data, userId, assessmentId) {
+      return data.keys().hasAll([
+          'id', 'uid', 'createdAtIso', 'language', 'subject', 'classLevel',
+          'topic', 'difficulty', 'assessmentType', 'data', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'uid', 'createdAtIso', 'language', 'subject', 'classLevel',
+          'topic', 'difficulty', 'assessmentType', 'data', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        data.id == assessmentId &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        data.uid == request.auth.uid &&
+        data.createdAtIso is string && data.createdAtIso.size() <= 40 &&
+        isValidLang(data.language) &&
+        data.subject is string && data.subject.size() <= 120 &&
+        data.classLevel is string && data.classLevel.size() <= 40 &&
+        data.topic is string && data.topic.size() <= 240 &&
+        data.difficulty is string && data.difficulty.size() <= 40 &&
+        data.assessmentType is string && data.assessmentType.size() <= 40 &&
+        isValidAssessmentContent(data.data) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidMethodologyContent(d) {
+      return d is map &&
+        d.keys().hasAll([
+          'title', 'coreApproach', 'strategies', 'differentiationSen',
+          'formativeChecks', 'recommendedMaterials'
+        ]) &&
+        d.keys().hasOnly([
+          'title', 'coreApproach', 'strategies', 'differentiationSen',
+          'formativeChecks', 'recommendedMaterials'
+        ]) &&
+        d.title is string && d.title.size() <= 300 &&
+        d.coreApproach is string && d.coreApproach.size() <= 3000 &&
+        d.differentiationSen is string && d.differentiationSen.size() <= 3000 &&
+        d.strategies is list && d.strategies.size() <= 20 &&
+        (d.strategies.size() == 0 || (
+          d.strategies[0] is map &&
+          d.strategies[0].name is string && d.strategies[0].name.size() <= 200
+        )) &&
+        d.formativeChecks is list && d.formativeChecks.size() <= 20 &&
+        (d.formativeChecks.size() == 0 || (
+          d.formativeChecks[0] is string && d.formativeChecks[0].size() <= 1000
+        )) &&
+        d.recommendedMaterials is list && d.recommendedMaterials.size() <= 30 &&
+        (d.recommendedMaterials.size() == 0 || (
+          d.recommendedMaterials[0] is string && d.recommendedMaterials[0].size() <= 500
+        ));
+    }
+
+    function isValidSavedMethodology(data, userId, methodologyId) {
+      return data.keys().hasAll([
+          'id', 'uid', 'createdAtIso', 'language', 'subject', 'classLevel',
+          'topic', 'data', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'uid', 'createdAtIso', 'language', 'subject', 'classLevel',
+          'topic', 'data', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        data.id == methodologyId &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        data.uid == request.auth.uid &&
+        data.createdAtIso is string && data.createdAtIso.size() <= 40 &&
+        isValidLang(data.language) &&
+        data.subject is string && data.subject.size() <= 120 &&
+        data.classLevel is string && data.classLevel.size() <= 40 &&
+        data.topic is string && data.topic.size() <= 240 &&
+        isValidMethodologyContent(data.data) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // ==================== COLLECTION MATCH BLOCKS ====================
+    match /users/{userId} {
+      allow get: if isVerifiedOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isVerifiedOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserAccount(incoming(), userId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isVerifiedOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserAccount(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']);
+      allow delete: if false;
+
+      match /private/{docId} {
+        allow get: if isVerifiedOwner(userId) && isValidId(userId) && docId == 'profile';
+        allow list: if false;
+        allow create: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          docId == 'profile' &&
+          isValidPrivateProfile(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          hasValidParentUser(userId);
+        allow update: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          docId == 'profile' &&
+          isValidPrivateProfile(incoming(), userId) &&
+          incoming().uid == existing().uid &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'email', 'schoolName', 'teacherName', 'defaultTerm', 'lang', 'theme', 'updatedAt'
+          ]) &&
+          hasValidParentUser(userId);
+        allow delete: if false;
+      }
+
+      match /plans/{planId} {
+        allow get: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(planId);
+        allow list: if isVerifiedOwner(userId) && isValidId(userId) && existing().uid == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(planId) &&
+          isValidSavedPlan(incoming(), userId, planId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          hasValidParentUser(userId);
+        allow update: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(planId) &&
+          isValidSavedPlan(incoming(), userId, planId) &&
+          incoming().id == existing().id &&
+          incoming().uid == existing().uid &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().createdAtIso == existing().createdAtIso &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'language', 'updatedAtIso', 'plan', 'updatedAt'
+          ]) &&
+          hasValidParentUser(userId);
+        allow delete: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(planId);
+      }
+
+      match /chats/{chatId} {
+        allow get: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(chatId);
+        allow list: if isVerifiedOwner(userId) && isValidId(userId) && existing().uid == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(chatId) &&
+          isValidChatThread(incoming(), userId, chatId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          hasValidParentUser(userId);
+        allow update: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(chatId) &&
+          isValidChatThread(incoming(), userId, chatId) &&
+          incoming().id == existing().id &&
+          incoming().uid == existing().uid &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().createdAtIso == existing().createdAtIso &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'updatedAtIso', 'messages', 'updatedAt'
+          ]) &&
+          hasValidParentUser(userId);
+        allow delete: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(chatId);
+      }
+
+      match /assessments/{assessmentId} {
+        allow get: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(assessmentId);
+        allow list: if isVerifiedOwner(userId) && isValidId(userId) && existing().uid == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(assessmentId) &&
+          isValidSavedAssessment(incoming(), userId, assessmentId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          hasValidParentUser(userId);
+        allow update: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(assessmentId) &&
+          isValidSavedAssessment(incoming(), userId, assessmentId) &&
+          incoming().id == existing().id &&
+          incoming().uid == existing().uid &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().createdAtIso == existing().createdAtIso &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'language', 'subject', 'classLevel', 'topic', 'difficulty', 'assessmentType', 'data', 'updatedAt'
+          ]) &&
+          hasValidParentUser(userId);
+        allow delete: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(assessmentId);
+      }
+
+      match /methodologies/{methodologyId} {
+        allow get: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(methodologyId);
+        allow list: if isVerifiedOwner(userId) && isValidId(userId) && existing().uid == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(methodologyId) &&
+          isValidSavedMethodology(incoming(), userId, methodologyId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          hasValidParentUser(userId);
+        allow update: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(methodologyId) &&
+          isValidSavedMethodology(incoming(), userId, methodologyId) &&
+          incoming().id == existing().id &&
+          incoming().uid == existing().uid &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().createdAtIso == existing().createdAtIso &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'language', 'subject', 'classLevel', 'topic', 'data', 'updatedAt'
+          ]) &&
+          hasValidParentUser(userId);
+        allow delete: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(methodologyId);
+      }
+    }
+  }
+}

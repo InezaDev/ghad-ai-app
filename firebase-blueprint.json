@@ -1,0 +1,410 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Root user account document used as parent ownership gate for subcollections (no PII).",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the teacher",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Non-sensitive display label",
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp"
+        }
+      },
+      "required": ["uid", "displayName", "createdAt", "updatedAt"]
+    },
+    "TeacherPrivateProfile": {
+      "title": "TeacherPrivateProfile",
+      "description": "Isolated private teacher profile containing PII (email, schoolName, teacherName) and workspace defaults.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Teacher email address",
+          "maxLength": 254
+        },
+        "schoolName": {
+          "type": "string",
+          "description": "Default school name",
+          "maxLength": 160
+        },
+        "teacherName": {
+          "type": "string",
+          "description": "Default teacher name",
+          "maxLength": 120
+        },
+        "defaultTerm": {
+          "type": "string",
+          "enum": ["Term 1", "Term 2", "Term 3"],
+          "description": "Default academic term",
+          "maxLength": 20
+        },
+        "lang": {
+          "type": "string",
+          "enum": ["en", "rw", "fr"],
+          "description": "Preferred UI and AI language",
+          "maxLength": 5
+        },
+        "theme": {
+          "type": "string",
+          "enum": ["auto", "light", "dark"],
+          "description": "Preferred UI color theme",
+          "maxLength": 10
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp"
+        }
+      },
+      "required": [
+        "uid",
+        "email",
+        "schoolName",
+        "teacherName",
+        "defaultTerm",
+        "lang",
+        "theme",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SavedPlanDoc": {
+      "title": "SavedPlanDoc",
+      "description": "Saved official REB CBC lesson plan document owned by a teacher.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Plan document ID",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "language": {
+          "type": "string",
+          "enum": ["en", "rw", "fr"],
+          "description": "Plan language",
+          "maxLength": 5
+        },
+        "createdAtIso": {
+          "type": "string",
+          "description": "Client ISO timestamp for display",
+          "maxLength": 40
+        },
+        "updatedAtIso": {
+          "type": "string",
+          "description": "Client ISO update timestamp for display",
+          "maxLength": 40
+        },
+        "plan": {
+          "type": "object",
+          "description": "Structured REB LessonPlanData map including metadata and bounded stages array"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "uid",
+        "language",
+        "createdAtIso",
+        "updatedAtIso",
+        "plan",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ChatThreadDoc": {
+      "title": "ChatThreadDoc",
+      "description": "Saved AI Teaching Assistant conversation thread owned by a teacher.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Thread document ID",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Conversation title",
+          "maxLength": 200
+        },
+        "createdAtIso": {
+          "type": "string",
+          "description": "Creation ISO string",
+          "maxLength": 40
+        },
+        "updatedAtIso": {
+          "type": "string",
+          "description": "Last update ISO string",
+          "maxLength": 40
+        },
+        "messages": {
+          "type": "array",
+          "description": "Bounded list of chat messages (max 100 entries)"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "uid",
+        "title",
+        "createdAtIso",
+        "updatedAtIso",
+        "messages",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SavedAssessmentDoc": {
+      "title": "SavedAssessmentDoc",
+      "description": "Saved CBC assessment and marking scheme owned by a teacher.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Assessment document ID",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAtIso": {
+          "type": "string",
+          "description": "Creation ISO string",
+          "maxLength": 40
+        },
+        "language": {
+          "type": "string",
+          "enum": ["en", "rw", "fr"],
+          "description": "Assessment language",
+          "maxLength": 5
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject name",
+          "maxLength": 120
+        },
+        "classLevel": {
+          "type": "string",
+          "description": "Class level (P1-S6)",
+          "maxLength": 40
+        },
+        "topic": {
+          "type": "string",
+          "description": "Lesson topic",
+          "maxLength": 240
+        },
+        "difficulty": {
+          "type": "string",
+          "description": "Assessment difficulty",
+          "maxLength": 40
+        },
+        "assessmentType": {
+          "type": "string",
+          "description": "Assessment question format",
+          "maxLength": 40
+        },
+        "data": {
+          "type": "object",
+          "description": "Structured AssessmentData map with bounded questions array"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "uid",
+        "createdAtIso",
+        "language",
+        "subject",
+        "classLevel",
+        "topic",
+        "difficulty",
+        "assessmentType",
+        "data",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SavedMethodologyDoc": {
+      "title": "SavedMethodologyDoc",
+      "description": "Saved CBC learner-centred methodology guide owned by a teacher.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Methodology document ID",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAtIso": {
+          "type": "string",
+          "description": "Creation ISO string",
+          "maxLength": 40
+        },
+        "language": {
+          "type": "string",
+          "enum": ["en", "rw", "fr"],
+          "description": "Methodology language",
+          "maxLength": 5
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject name",
+          "maxLength": 120
+        },
+        "classLevel": {
+          "type": "string",
+          "description": "Class level (P1-S6)",
+          "maxLength": 40
+        },
+        "topic": {
+          "type": "string",
+          "description": "Lesson topic",
+          "maxLength": 240
+        },
+        "data": {
+          "type": "object",
+          "description": "Structured MethodologyData map with bounded strategy arrays"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "uid",
+        "createdAtIso",
+        "language",
+        "subject",
+        "classLevel",
+        "topic",
+        "data",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserAccount"
+      },
+      "description": "Teacher account root document (non-PII parent anchor)"
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": {
+        "$ref": "#/entities/TeacherPrivateProfile"
+      },
+      "description": "Teacher private PII & workspace preference profile (docId='profile')"
+    },
+    "/users/{userId}/plans/{planId}": {
+      "schema": {
+        "$ref": "#/entities/SavedPlanDoc"
+      },
+      "description": "Teacher's saved REB CBC lesson plans"
+    },
+    "/users/{userId}/chats/{chatId}": {
+      "schema": {
+        "$ref": "#/entities/ChatThreadDoc"
+      },
+      "description": "Teacher's persistent AI Teaching Assistant threads"
+    },
+    "/users/{userId}/assessments/{assessmentId}": {
+      "schema": {
+        "$ref": "#/entities/SavedAssessmentDoc"
+      },
+      "description": "Teacher's saved competence-based assessments"
+    },
+    "/users/{userId}/methodologies/{methodologyId}": {
+      "schema": {
+        "$ref": "#/entities/SavedMethodologyDoc"
+      },
+      "description": "Teacher's saved CBC methodology guides"
+    }
+  }
+}

@@ -1,0 +1,281 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-subtle: #f1f5f9;
+  --text: #0f172a;
+  --muted: #475569;
+  --primary: #15803d;
+  --primary-hover: #166534;
+  --primary-ink: #15803d;
+  --sky: #0284c7;
+  --gold: #f59e0b;
+  --gold-soft: rgba(245, 158, 11, 0.12);
+  --border: #e2e8f0;
+  --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.dark {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-subtle: #263549;
+  --text: #f8fafc;
+  --muted: #94a3b8;
+  --primary: #15803d;
+  --primary-hover: #166534;
+  --primary-ink: #4ade80;
+  --sky: #38bdf8;
+  --gold: #fbbf24;
+  --gold-soft: rgba(251, 191, 36, 0.14);
+  --border: #334155;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-family: var(--font-body);
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+  text-wrap: balance;
+}
+
+.font-mono-tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Official REB CBC A4 Paper Lesson Plan Sheet */
+.reb-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  padding: 0.25rem;
+}
+
+.reb-sheet {
+  width: 100%;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  line-height: 1.48;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.375rem;
+  box-shadow: 0 12px 28px -12px rgba(15, 23, 42, 0.14);
+}
+
+.dark .reb-sheet {
+  background: #ffffff;
+  color: #0f172a;
+  border-color: #334155;
+  box-shadow: 0 14px 32px -12px rgba(0, 0, 0, 0.45);
+}
+
+.reb-sheet table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1.5px solid #0f172a;
+}
+
+.reb-sheet th,
+.reb-sheet td {
+  border: 1px solid #1e293b;
+  padding: 0.5rem 0.65rem;
+  vertical-align: top;
+  text-align: left;
+}
+
+.reb-sheet th {
+  background-color: #ecfdf5;
+  color: #0f172a;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.reb-sheet [contenteditable="true"] {
+  outline: none;
+  min-height: 1.3em;
+  border-radius: 2px;
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.reb-sheet [contenteditable="true"]:hover {
+  background-color: rgba(21, 128, 61, 0.06);
+}
+
+.reb-sheet [contenteditable="true"]:focus {
+  background-color: rgba(21, 128, 61, 0.1);
+  box-shadow: inset 0 0 0 1.5px #15803d;
+}
+
+/* Smooth view entrance */
+@keyframes viewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.view-animate {
+  animation: viewFadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Modern 3D Perspective & Depth Layering */
+.perspective-stage {
+  perspective: 1200px;
+}
+
+.card-3d-depth {
+  transform-style: preserve-3d;
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 260ms ease, border-color 200ms ease;
+  box-shadow:
+    0 10px 24px -12px rgba(15, 23, 42, 0.14),
+    0 2px 6px -2px rgba(15, 23, 42, 0.06);
+}
+
+.card-3d-depth:hover {
+  transform: translateY(-4px) rotateX(1.5deg);
+  box-shadow:
+    0 22px 42px -16px rgba(15, 23, 42, 0.22),
+    0 6px 14px -4px rgba(21, 128, 61, 0.12);
+}
+
+.dark .card-3d-depth {
+  box-shadow:
+    0 14px 32px -14px rgba(0, 0, 0, 0.52),
+    0 2px 6px -2px rgba(0, 0, 0, 0.3);
+}
+
+.dark .card-3d-depth:hover {
+  box-shadow:
+    0 24px 48px -16px rgba(0, 0, 0, 0.65),
+    0 6px 18px -4px rgba(56, 189, 248, 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .view-animate {
+    animation: none;
+  }
+  .card-3d-depth,
+  .card-3d-depth:hover {
+    transform: none;
+    transition: border-color 150ms ease;
+  }
+}
+
+/* Clean A4 Print Stylesheet */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 10.5pt !important;
+  }
+
+  #landingPage,
+  #sidebar,
+  #menuToggle,
+  #toastContainer,
+  .no-print,
+  nav,
+  aside,
+  header.workspace-topbar {
+    display: none !important;
+  }
+
+  #workspaceApp {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .workspace-main {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .print-only-area {
+    display: block !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .reb-sheet {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 9.5pt !important;
+    padding: 0 !important;
+  }
+
+  .reb-sheet table {
+    border: 1.5px solid #000000 !important;
+    page-break-inside: auto;
+  }
+
+  .reb-sheet thead {
+    display: table-header-group;
+  }
+
+  .reb-sheet tbody {
+    display: table-row-group;
+  }
+
+  .reb-sheet th,
+  .reb-sheet td {
+    border: 1px solid #000000 !important;
+    color: #000000 !important;
+    padding: 4px 6px !important;
+  }
+
+  .reb-sheet th {
+    background-color: #ecfdf5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .reb-sheet tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .print-hide-row-controls {
+    display: none !important;
+  }
+}

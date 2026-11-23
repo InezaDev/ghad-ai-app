@@ -1,0 +1,6 @@
+{
+  "name": "GHAD AI — Rwanda CBC Teaching Assistant",
+  "description": "AI-powered REB Competence-Based Curriculum (CBC) lesson planner, assessment builder, methodology guide, and teaching assistant for Rwandan teachers (P1–S6) in English, Kinyarwanda, and French.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

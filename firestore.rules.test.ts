@@ -1,0 +1,143 @@
+// Phase 0 Security TDD Specification Tests for GHAD AI Firestore Rules
+// Verifies that all "Dirty Dozen" payloads are rejected with PERMISSION_DENIED.
+// Intended for execution against the Firebase Firestore Rules Emulator when available.
+
+export interface DirtyDozenCase {
+  id: number;
+  name: string;
+  auth: { uid: string; email_verified: boolean } | null;
+  operation: 'get' | 'list' | 'create' | 'update' | 'delete';
+  path: string;
+  payload?: Record<string, unknown>;
+  expected: 'PERMISSION_DENIED';
+}
+
+export const DIRTY_DOZEN_CASES: DirtyDozenCase[] = [
+  {
+    id: 1,
+    name: 'Unauthenticated read on private plans',
+    auth: null,
+    operation: 'get',
+    path: 'users/teacherA/plans/plan_1',
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    id: 2,
+    name: 'Unverified email user write to private profile',
+    auth: { uid: 'teacherA', email_verified: false },
+    operation: 'create',
+    path: 'users/teacherA/private/profile',
+    payload: {
+      uid: 'teacherA',
+      email: 'a@school.rw',
+      schoolName: 'GS Kigali',
+      teacherName: 'Alice',
+      defaultTerm: 'Term 1',
+      lang: 'en',
+      theme: 'auto',
+    },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    id: 3,
+    name: 'Cross-tenant list on another teacher plans',
+    auth: { uid: 'teacherB', email_verified: true },
+    operation: 'list',
+    path: 'users/teacherA/plans',
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    id: 4,
+    name: 'Cross-tenant PII read on private profile',
+    auth: { uid: 'teacherB', email_verified: true },
+    operation: 'get',
+    path: 'users/teacherA/private/profile',
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    id: 5,
+    name: 'Identity spoofing uid mismatch on plan create',
+    auth: { uid: 'teacherA', email_verified: true },
+    operation: 'create',
+    path: 'users/teacherA/plans/plan_1',
+    payload: { id: 'plan_1', uid: 'teacherB', language: 'en' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    id: 6,
+    name: 'Shadow ghost field isAdmin injected on user create',
+    auth: { uid: 'teacherA', email_verified: true },
+    operation: 'create',
+    path: 'users/teacherA',
+    payload: { uid: 'teacherA', displayName: 'Alice', isAdmin: true },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    id: 7,
+    name: 'Orphaned subcollection write without parent /users/teacherA',
+    auth: { uid: 'teacherC', email_verified: true },
+    operation: 'create',
+    path: 'users/teacherC/plans/plan_1',
+    payload: { id: 'plan_1', uid: 'teacherC', language: 'en' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    id: 8,
+    name: 'ID poisoning with invalid characters or excessive length',
+    auth: { uid: 'teacherA', email_verified: true },
+    operation: 'create',
+    path: 'users/teacherA/plans/' + 'x'.repeat(200),
+    payload: { id: 'x'.repeat(200), uid: 'teacherA', language: 'en' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    id: 9,
+    name: 'Immortal createdAt mutation on update',
+    auth: { uid: 'teacherA', email_verified: true },
+    operation: 'update',
+    path: 'users/teacherA/plans/plan_1',
+    payload: { createdAt: new Date(0).toISOString() },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    id: 10,
+    name: 'Client-spoofed timestamp instead of server request.time',
+    auth: { uid: 'teacherA', email_verified: true },
+    operation: 'create',
+    path: 'users/teacherA',
+    payload: {
+      uid: 'teacherA',
+      displayName: 'Alice',
+      createdAt: '2020-01-01T00:00:00Z',
+      updatedAt: '2020-01-01T00:00:00Z',
+    },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    id: 11,
+    name: 'Value poisoning oversized title and >100 chat messages',
+    auth: { uid: 'teacherA', email_verified: true },
+    operation: 'create',
+    path: 'users/teacherA/chats/chat_1',
+    payload: {
+      id: 'chat_1',
+      uid: 'teacherA',
+      title: 'A'.repeat(500),
+      messages: Array.from({ length: 105 }, (_, i) => ({
+        id: `m_${i}`,
+        role: 'user',
+        text: 'hi',
+        timestamp: '2026-01-01T00:00:00Z',
+      })),
+    },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    id: 12,
+    name: 'Catch-all default deny on undeclared collection',
+    auth: { uid: 'teacherA', email_verified: true },
+    operation: 'get',
+    path: 'admins/teacherA',
+    expected: 'PERMISSION_DENIED',
+  },
+];
