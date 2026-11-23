@@ -184,7 +184,7 @@ export const HeroScene3D: React.FC = () => {
     renderer.toneMappingExposure = 1.1;
     renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 2));
     renderer.shadowMap.enabled = !isSoftwareGl;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
 
     const width = Math.max(280, container.clientWidth);
     const height = Math.max(260, container.clientHeight);
@@ -484,7 +484,7 @@ export const HeroScene3D: React.FC = () => {
     // Animation loop with software WebGL pacing via afterDraw
     let frameId = 0;
     let disposed = false;
-    const clock = new THREE.Clock();
+    let lastTime = performance.now();
 
     function afterDraw(cb: () => void) {
       const gl = renderer.getContext() as WebGL2RenderingContext;
@@ -512,8 +512,10 @@ export const HeroScene3D: React.FC = () => {
 
     function tick() {
       if (disposed) return;
-      const delta = Math.min(0.05, clock.getDelta());
-      const elapsed = clock.getElapsedTime();
+      const now = performance.now();
+      const delta = Math.min(0.05, (now - lastTime) * 0.001);
+      lastTime = now;
+      const elapsed = now * 0.001;
 
       // Gentle breathing float on book cradle + steady rotation with pointer damping
       bookGroup.position.y = 0.62 + Math.sin(elapsed * 1.4) * 0.025;

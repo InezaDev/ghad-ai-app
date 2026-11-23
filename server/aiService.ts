@@ -12,13 +12,10 @@ export class AiServiceHttpError extends Error {
   }
 }
 
-function getAiClient(): GoogleGenAI {
+function getAiClient(): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
-    throw new AiServiceHttpError(
-      500,
-      'GEMINI_API_KEY is not configured on the server. Please configure it in Settings > Secrets or .env.'
-    );
+    return null;
   }
   return new GoogleGenAI({
     apiKey,
@@ -121,9 +118,12 @@ function buildConfigForModel(
 }
 
 async function generateWithResilience(
-  ai: GoogleGenAI,
+  ai: GoogleGenAI | null,
   params: Omit<GenerateContentParameters, 'model'>
 ) {
+  if (!ai) {
+    throw new AiServiceHttpError(503, 'GEMINI_API_KEY is not configured on the server. Please configure it in Settings > Secrets.');
+  }
   const now = Date.now();
   const readyModels = MODEL_CHAIN.filter((m) => (modelCooldownUntil[m] || 0) <= now);
   const orderedModels =
@@ -549,89 +549,96 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
     .join('\n');
 
   const ai = getAiClient();
-  const response = await generateWithResilience(ai, {
-    contents: userPrompt,
-    config: {
-      systemInstruction,
-      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          schoolName: { type: Type.STRING },
-          teacherName: { type: Type.STRING },
-          term: { type: Type.STRING },
-          date: { type: Type.STRING },
-          subject: { type: Type.STRING },
-          classLevel: { type: Type.STRING },
-          unitNo: { type: Type.STRING },
-          lessonNo: { type: Type.STRING },
-          durationMinutes: { type: Type.INTEGER },
-          classSize: { type: Type.STRING },
-          sen: { type: Type.STRING },
-          unitTitle: { type: Type.STRING },
-          keyUnitCompetence: { type: Type.STRING },
-          lessonTitle: { type: Type.STRING },
-          instructionalObjective: { type: Type.STRING },
-          planLocation: { type: Type.STRING },
-          learningMaterials: { type: Type.STRING },
-          references: { type: Type.STRING },
-          activityOverview: { type: Type.STRING },
-          stages: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                stageType: {
-                  type: Type.STRING,
-                  description: 'Must be one of: intro, development, conclusion',
+  let parsed: Record<string, unknown> = {};
+  if (ai) {
+    try {
+      const response = await generateWithResilience(ai, {
+        contents: userPrompt,
+        config: {
+          systemInstruction,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              schoolName: { type: Type.STRING },
+              teacherName: { type: Type.STRING },
+              term: { type: Type.STRING },
+              date: { type: Type.STRING },
+              subject: { type: Type.STRING },
+              classLevel: { type: Type.STRING },
+              unitNo: { type: Type.STRING },
+              lessonNo: { type: Type.STRING },
+              durationMinutes: { type: Type.INTEGER },
+              classSize: { type: Type.STRING },
+              sen: { type: Type.STRING },
+              unitTitle: { type: Type.STRING },
+              keyUnitCompetence: { type: Type.STRING },
+              lessonTitle: { type: Type.STRING },
+              instructionalObjective: { type: Type.STRING },
+              planLocation: { type: Type.STRING },
+              learningMaterials: { type: Type.STRING },
+              references: { type: Type.STRING },
+              activityOverview: { type: Type.STRING },
+              stages: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    stageType: {
+                      type: Type.STRING,
+                      description: 'Must be one of: intro, development, conclusion',
+                    },
+                    stageName: { type: Type.STRING },
+                    timingMinutes: { type: Type.INTEGER },
+                    teacherActivities: { type: Type.STRING },
+                    learnerActivities: { type: Type.STRING },
+                    competencesAndIssues: { type: Type.STRING },
+                  },
+                  required: [
+                    'stageType',
+                    'stageName',
+                    'timingMinutes',
+                    'teacherActivities',
+                    'learnerActivities',
+                    'competencesAndIssues',
+                  ],
                 },
-                stageName: { type: Type.STRING },
-                timingMinutes: { type: Type.INTEGER },
-                teacherActivities: { type: Type.STRING },
-                learnerActivities: { type: Type.STRING },
-                competencesAndIssues: { type: Type.STRING },
               },
-              required: [
-                'stageType',
-                'stageName',
-                'timingMinutes',
-                'teacherActivities',
-                'learnerActivities',
-                'competencesAndIssues',
-              ],
+              teacherSelfEvaluation: { type: Type.STRING },
             },
+            required: [
+              'schoolName',
+              'teacherName',
+              'term',
+              'date',
+              'subject',
+              'classLevel',
+              'unitNo',
+              'unitTitle',
+              'lessonNo',
+              'durationMinutes',
+              'classSize',
+              'sen',
+              'keyUnitCompetence',
+              'lessonTitle',
+              'instructionalObjective',
+              'planLocation',
+              'learningMaterials',
+              'references',
+              'activityOverview',
+              'stages',
+              'teacherSelfEvaluation',
+            ],
           },
-          teacherSelfEvaluation: { type: Type.STRING },
         },
-        required: [
-          'schoolName',
-          'teacherName',
-          'term',
-          'date',
-          'subject',
-          'classLevel',
-          'unitNo',
-          'unitTitle',
-          'lessonNo',
-          'durationMinutes',
-          'classSize',
-          'sen',
-          'keyUnitCompetence',
-          'lessonTitle',
-          'instructionalObjective',
-          'planLocation',
-          'learningMaterials',
-          'references',
-          'activityOverview',
-          'stages',
-          'teacherSelfEvaluation',
-        ],
-      },
-    },
-  });
+      });
+      parsed = parseJsonSafely<Record<string, unknown>>(response.text || '', 'lesson plan');
+    } catch (err) {
+      console.warn('[GHAD AI] Using robust offline REB CBC fallback for lesson plan:', err);
+    }
+  }
 
-  const parsed = parseJsonSafely<Record<string, unknown>>(response.text || '', 'lesson plan');
   const rawStages = Array.isArray(parsed.stages) ? (parsed.stages as Array<Record<string, unknown>>) : [];
 
   const finalSubject = pickMeaningful(input.subject, parsed.subject, subjectInput || 'Subject');
