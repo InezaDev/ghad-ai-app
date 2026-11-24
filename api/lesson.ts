@@ -1,22 +1,35 @@
-import { ExistingLessonDraft, generateRebLessonPlan, normalizeError } from '../server/aiService';
+import { ExistingLessonDraft, generateRebLessonPlan, normalizeError } from '../server/aiService.js';
+import { parseRequestBody } from './_utils.js';
 
 interface VercelReq {
   method?: string;
-  body?: Record<string, unknown>;
+  body?: unknown;
 }
 
 interface VercelRes {
   status: (code: number) => VercelRes;
   json: (payload: unknown) => void;
+  end?: () => void;
 }
 
 export default async function handler(req: VercelReq, res: VercelRes) {
+  if (req.method === 'OPTIONS') {
+    res.status(204);
+    if (res.end) res.end();
+    else res.json({});
+    return;
+  }
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
   try {
-    const body = req.body || {};
+    const parsedBody = parseRequestBody(req.body);
+    if (!parsedBody.ok) {
+      res.status(400).json({ error: parsedBody.error });
+      return;
+    }
+    const body = parsedBody.body;
     const existingPlan =
       body.existingPlan && typeof body.existingPlan === 'object'
         ? (body.existingPlan as ExistingLessonDraft)
@@ -60,6 +73,7 @@ export default async function handler(req: VercelReq, res: VercelRes) {
 
     res.status(200).json({ plan });
   } catch (err) {
+    console.error('[GHAD AI /api/lesson]', err);
     const { status, message } = normalizeError(err);
     res.status(status).json({ error: message });
   }

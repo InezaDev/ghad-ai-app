@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
 :root {
   --bg: #030712;
   --surface: rgba(248, 250, 252, 0.9);
@@ -15,9 +21,9 @@
   --gold: #f59e0b;
   --gold-soft: rgba(245, 158, 11, 0.14);
   --border: rgba(16, 185, 129, 0.34);
-  --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
-  --font-body: "DM Sans", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 .dark {
@@ -57,12 +63,23 @@ body {
   color: #f1f5f9;
 }
 
-h1, h2, h3, h4, .font-display {
+h1, h2, h3, .font-display, #sidebar nav button, .sidebar-nav-title {
+  font-family: var(--font-display);
+  letter-spacing: 0.03em;
+  text-wrap: balance;
+}
+
+h4 {
   font-family: var(--font-display);
   text-wrap: balance;
 }
 
-.font-mono-tabular {
+#chatMessages {
+  font-family: var(--font-body);
+}
+
+.font-mono-tabular,
+.source-citation {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
@@ -166,7 +183,7 @@ html.dark[data-graphics="low"] .holo-glass {
 .reb-sheet th {
   background-color: #ecfdf5;
   color: #0f172a;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: 700;
   font-size: 0.78rem;
 }

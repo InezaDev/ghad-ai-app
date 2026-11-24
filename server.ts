@@ -10,7 +10,7 @@ import {
   generateRebLessonPlan,
   generateRebMethodology,
   normalizeError,
-} from './server/aiService.ts';
+} from './server/aiService.js';
 
 dotenv.config();
 

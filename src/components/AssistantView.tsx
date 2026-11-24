@@ -659,7 +659,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
                         </div>
                       </div>
 
-                      <div className="px-4 py-3.5 text-sm text-[var(--text)] leading-relaxed">
+                      <div className="px-4 py-3.5 font-sans text-sm text-[var(--text)] leading-relaxed">
                         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                           {m.text}
                         </ReactMarkdown>
@@ -667,7 +667,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
 
                       {safeSources.length > 0 && (
                         <div className="px-4 py-2.5 border-t border-[var(--border)] bg-[var(--surface)]/70 space-y-1.5">
-                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--muted)]">
+                          <div className="flex items-center gap-1.5 text-[11px] font-semibold font-mono-tabular text-[var(--muted)]">
                             <Globe className="w-3 h-3 text-[#0284C7] dark:text-[#38BDF8]" />
                             <span>{t('assistant_sources_label')}</span>
                           </div>
@@ -678,7 +678,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
                                 href={src.uri}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 max-w-[260px] px-2.5 py-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:border-[#0284C7] text-[11px] font-medium text-[#0284C7] dark:text-[#38BDF8] transition-colors"
+                                className="source-citation inline-flex items-center gap-1 max-w-[260px] px-2.5 py-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:border-[#0284C7] text-[11px] font-medium text-[#0284C7] dark:text-[#38BDF8] transition-colors"
                                 title={src.uri}
                               >
                                 <span className="truncate">{src.title || getHostname(src.uri)}</span>

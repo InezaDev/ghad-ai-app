@@ -629,7 +629,7 @@ export default function App() {
                       }`}
                     >
                       <Icon className="w-4 h-4 shrink-0" />
-                      <span data-i18n={item.key} className="truncate">
+                      <span data-i18n={item.key} className="font-display tracking-[0.03em] truncate">
                         {t(item.key)}
                       </span>
                     </button>

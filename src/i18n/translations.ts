@@ -382,6 +382,8 @@ export const I18N: Record<Lang, Record<string, string>> = {
     hero_preset_rings: 'CBC Rings',
     hero_3d_unavailable_title: 'Interactive 3D REB CBC Showcase',
     hero_3d_unavailable_desc: '3D WebGL preview is unavailable on this device — all lesson planning tools work cleanly below.',
+    auth_err_unauthorized_domain:
+      'This domain ({domain}) is not yet authorized for Google Sign-In in Firebase Console -> Authentication -> Settings -> Authorized domains. Add it there or sign in with Email below.',
     auth_err_op_not_allowed: 'Email/Password sign-in is not enabled yet in Firebase Console. Google Sign-In works right away.',
     auth_err_email_in_use: 'An account with this email already exists. Try signing in instead.',
     auth_err_invalid_email: 'Please enter a valid email address.',
@@ -777,6 +779,8 @@ export const I18N: Record<Lang, Record<string, string>> = {
     hero_preset_rings: 'Inziga za CBC',
     hero_3d_unavailable_title: 'Imurika rya 3D rya REB CBC',
     hero_3d_unavailable_desc: '3D WebGL ntikora kuri iki gikoresho — ibikoresho byose byo gutegura isomo birakora neza hasi.',
+    auth_err_unauthorized_domain:
+      'Uru rubuga ({domain}) ntiruremererwa gukoresha Google Sign-In muri Firebase Console -> Authentication -> Settings -> Authorized domains. Rwongereyo cyangwa winjire ukoresheje Email hasi.',
     auth_err_op_not_allowed: 'Kwinjira na Email/Ijambobanga ntibirafungurwa muri Firebase. Koresha Google Sign-In ako kanya.',
     auth_err_email_in_use: 'Iyi email isanzwe ifite konti. Gerageza kwinjira.',
     auth_err_invalid_email: 'Nyamuneka andika email nyayo.',
@@ -1172,6 +1176,8 @@ export const I18N: Record<Lang, Record<string, string>> = {
     hero_preset_rings: 'Anneaux CBC',
     hero_3d_unavailable_title: 'Vitrine Interactive 3D REB CBC',
     hero_3d_unavailable_desc: 'L’aperçu WebGL 3D est indisponible sur cet appareil — tous les outils de préparation fonctionnent ci-dessous.',
+    auth_err_unauthorized_domain:
+      'Ce domaine ({domain}) n’est pas encore autorisé pour Google Sign-In dans Firebase Console -> Authentication -> Settings -> Authorized domains. Ajoutez-le ou connectez-vous par e-mail ci-dessous.',
     auth_err_op_not_allowed: 'La connexion par e-mail n’est pas encore activée dans Firebase. Google Sign-In fonctionne immédiatement.',
     auth_err_email_in_use: 'Un compte existe déjà avec cet e-mail. Essayez de vous connecter.',
     auth_err_invalid_email: 'Veuillez saisir une adresse e-mail valide.',
@@ -1567,6 +1573,8 @@ export const I18N: Record<Lang, Record<string, string>> = {
     hero_preset_rings: 'Pete za CBC',
     hero_3d_unavailable_title: 'Maonyesho ya 3D ya REB CBC',
     hero_3d_unavailable_desc: 'Hakikisho la 3D WebGL halipatikani kwenye kifaa hiki — zana zote za masomo zinafanya kazi hapa chini.',
+    auth_err_unauthorized_domain:
+      'Kikoa hiki ({domain}) bado hakijaidhinishwa kwa Google Sign-In katika Firebase Console -> Authentication -> Settings -> Authorized domains. Kiongeze huko au ingia kwa barua pepe hapa chini.',
     auth_err_op_not_allowed: 'Kuingia kwa Barua Pepe/Nenosiri hakujawashwa kwenye Firebase. Kuingia kwa Google kunafanya kazi mara moja.',
     auth_err_email_in_use: 'Akaunti yenye barua pepe hii tayari ipo. Jaribu kuingia.',
     auth_err_invalid_email: 'Tafadhali weka anwani sahihi ya barua pepe.',
