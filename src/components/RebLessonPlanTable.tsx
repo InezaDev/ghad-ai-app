@@ -82,17 +82,17 @@ export const RebLessonPlanTable: React.FC<RebLessonPlanTableProps> = ({ plan, la
   return (
     <div className="space-y-3">
       {/* Stage Time Checker & Live Total-Minutes Indicator */}
-      <div className="no-print flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] text-sm">
+      <div className="no-print holo-glass flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-[#38bdf8]/25 text-sm">
         <div className="flex flex-wrap items-center gap-2.5">
           {durationMatches ? (
             <span className="inline-flex items-center gap-1.5 font-semibold text-[#15803D] dark:text-[#4ADE80]">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Stage timing aligned:</span>
+              <span>{t('lesson_stage_aligned')}</span>
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 font-semibold text-amber-700 dark:text-amber-300">
               <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>Timing mismatch:</span>
+              <span>{t('lesson_stage_mismatch')}</span>
             </span>
           )}
           <span
@@ -110,13 +110,13 @@ export const RebLessonPlanTable: React.FC<RebLessonPlanTableProps> = ({ plan, la
               onClick={autoFitStagesToTarget}
               className="px-2.5 py-1 text-xs font-semibold rounded-md bg-[#F59E0B] text-white hover:bg-[#D97706] transition-colors cursor-pointer whitespace-nowrap"
             >
-              Auto-fit to {targetMinutes} min
+              {t('lesson_autofit')} {targetMinutes} min
             </button>
           )}
         </div>
 
         <div className="flex items-center gap-2.5">
-          <span className="text-xs text-[var(--muted)] hidden sm:inline">Click any cell to edit</span>
+          <span className="text-xs text-[var(--muted)] hidden sm:inline">{t('lesson_click_edit')}</span>
           <button
             type="button"
             onClick={addDevelopmentStep}
@@ -379,7 +379,7 @@ export const RebLessonPlanTable: React.FC<RebLessonPlanTableProps> = ({ plan, la
 
             <tbody>
               <tr>
-                <td className="text-xs font-semibold text-center bg-[#f8faf9]">Overview</td>
+                <td className="text-xs font-semibold text-center bg-[#f8faf9]">{t('cbc_overview')}</td>
                 <td
                   colSpan={2}
                   className="text-xs italic bg-white"
@@ -426,11 +426,11 @@ export const RebLessonPlanTable: React.FC<RebLessonPlanTableProps> = ({ plan, la
                           <button
                             type="button"
                             onClick={() => removeStage(stage.id)}
-                            title="Remove step"
+                            title={t('remove_btn')}
                             className="inline-flex items-center gap-1 text-[11px] text-red-700 hover:underline cursor-pointer"
                           >
                             <Trash2 className="w-3 h-3" />
-                            Remove
+                            {t('remove_btn')}
                           </button>
                         </div>
                       )}

@@ -229,7 +229,7 @@ export function lessonPlanToWordHtml(plan: LessonPlanData, lang: Lang): string {
         ${
           plan.activityOverview
             ? `<tr>
-            <td style="text-align:center;font-weight:bold;background:#f8faf9;">Overview</td>
+            <td style="text-align:center;font-weight:bold;background:#f8faf9;">${escHtml(t('cbc_overview'))}</td>
             <td colspan="2" style="font-style:italic;background:#fff;">${escHtml(plan.activityOverview)}</td>
             <td style="background:#f8faf9;"></td>
           </tr>`
@@ -258,39 +258,49 @@ export function lessonPlanToWordHtml(plan: LessonPlanData, lang: Lang): string {
   `;
 }
 
-export function assessmentToPlainText(data: AssessmentData, includeAnswers: boolean): string {
+export function assessmentToPlainText(
+  data: AssessmentData,
+  includeAnswers: boolean,
+  lang: Lang = 'en'
+): string {
+  const t = (k: string) => translate(lang, k);
   const lines = [
     data.title,
-    `Total Marks: ${data.totalMarks}`,
-    `Instructions: ${data.instructions}`,
+    `${t('assess_total_marks')}: ${data.totalMarks}`,
+    `${t('assess_instructions')}: ${data.instructions}`,
     '',
     ...data.questions.map((q) => {
       const opts = q.options.length ? '\n' + q.options.map((o) => `   ${o}`).join('\n') : '';
-      return `${q.number}. ${q.question} (${q.marks} marks)${opts}`;
+      return `${q.number}. ${q.question} (${q.marks} ${t('assess_marks_unit')})${opts}`;
     }),
   ];
 
   if (includeAnswers) {
-    lines.push('', 'ANSWER KEY & MARKING SCHEME', '========================================');
+    lines.push('', t('assess_answer_key_title').toUpperCase(), '========================================');
     data.questions.forEach((q) => {
-      lines.push(`${q.number}. Answer: ${q.answer} (${q.marks} marks)`);
-      if (q.markingNotes) lines.push(`   Marking notes: ${q.markingNotes}`);
+      lines.push(`${q.number}. ${t('assess_col_answer')}: ${q.answer} (${q.marks} ${t('assess_marks_unit')})`);
+      if (q.markingNotes) lines.push(`   ${t('assess_col_notes')}: ${q.markingNotes}`);
     });
   }
   return lines.join('\n');
 }
 
-export function assessmentToWordHtml(data: AssessmentData, includeAnswers: boolean): string {
+export function assessmentToWordHtml(
+  data: AssessmentData,
+  includeAnswers: boolean,
+  lang: Lang = 'en'
+): string {
+  const t = (k: string) => translate(lang, k);
   return `
     <h2>${escHtml(data.title)}</h2>
-    <p><strong>Total Marks:</strong> ${data.totalMarks}</p>
-    <p><strong>Instructions:</strong> ${escHtml(data.instructions)}</p>
+    <p><strong>${escHtml(t('assess_total_marks'))}:</strong> ${data.totalMarks}</p>
+    <p><strong>${escHtml(t('assess_instructions'))}:</strong> ${escHtml(data.instructions)}</p>
     <hr/>
     ${data.questions
       .map(
         (q) => `
       <div style="margin-bottom:10pt;">
-        <p><strong>${q.number}. ${escHtml(q.question)}</strong> <em>(${q.marks} marks)</em></p>
+        <p><strong>${q.number}. ${escHtml(q.question)}</strong> <em>(${q.marks} ${escHtml(t('assess_marks_unit'))})</em></p>
         ${
           q.options.length
             ? `<ul style="list-style:none;padding-left:14pt;">${q.options
@@ -305,9 +315,9 @@ export function assessmentToWordHtml(data: AssessmentData, includeAnswers: boole
       includeAnswers
         ? `
       <hr/>
-      <h3>Answer Key &amp; Marking Scheme</h3>
+      <h3>${escHtml(t('assess_answer_key_title'))}</h3>
       <table>
-        <thead><tr><th>#</th><th>Answer</th><th>Marks</th><th>Marking Notes</th></tr></thead>
+        <thead><tr><th>#</th><th>${escHtml(t('assess_col_answer'))}</th><th>${escHtml(t('assess_col_marks'))}</th><th>${escHtml(t('assess_col_notes'))}</th></tr></thead>
         <tbody>
           ${data.questions
             .map(
@@ -327,42 +337,44 @@ export function assessmentToWordHtml(data: AssessmentData, includeAnswers: boole
   `;
 }
 
-export function methodologyToPlainText(data: MethodologyData): string {
+export function methodologyToPlainText(data: MethodologyData, lang: Lang = 'en'): string {
+  const t = (k: string) => translate(lang, k);
   return [
     data.title,
-    `Core Approach: ${data.coreApproach}`,
+    `${t('method_core_approach')}: ${data.coreApproach}`,
     '',
-    'Strategies:',
+    `${t('method_col_strategy')}:`,
     ...data.strategies.map(
       (s, i) =>
         `${i + 1}. ${s.name} (${s.durationHint})\n` +
-        `   Description: ${s.description}\n` +
-        `   Teacher Role: ${s.teacherRole}\n` +
-        `   Learner Role: ${s.learnerRole}`
+        `   ${t('method_col_desc')}: ${s.description}\n` +
+        `   ${t('method_col_teacher')}: ${s.teacherRole}\n` +
+        `   ${t('method_col_learner')}: ${s.learnerRole}`
     ),
     '',
-    `SEN Differentiation: ${data.differentiationSen}`,
+    `${t('method_sen_title')}: ${data.differentiationSen}`,
     '',
-    'Formative Checks:',
+    `${t('method_formative_title')}:`,
     ...data.formativeChecks.map((f) => `- ${f}`),
     '',
-    'Recommended Materials:',
+    `${t('method_materials_title')}:`,
     ...data.recommendedMaterials.map((m) => `- ${m}`),
   ].join('\n');
 }
 
-export function methodologyToWordHtml(data: MethodologyData): string {
+export function methodologyToWordHtml(data: MethodologyData, lang: Lang = 'en'): string {
+  const t = (k: string) => translate(lang, k);
   return `
     <h2>${escHtml(data.title)}</h2>
-    <p><strong>Core CBC Approach:</strong> ${escHtml(data.coreApproach)}</p>
+    <p><strong>${escHtml(t('method_core_approach'))}:</strong> ${escHtml(data.coreApproach)}</p>
     <table>
       <thead>
         <tr>
-          <th>Strategy</th>
-          <th>Timing</th>
-          <th>Description</th>
-          <th>Teacher Role</th>
-          <th>Learner Role</th>
+          <th>${escHtml(t('method_col_strategy'))}</th>
+          <th>${escHtml(t('method_col_timing'))}</th>
+          <th>${escHtml(t('method_col_desc'))}</th>
+          <th>${escHtml(t('method_col_teacher'))}</th>
+          <th>${escHtml(t('method_col_learner'))}</th>
         </tr>
       </thead>
       <tbody>
@@ -381,11 +393,11 @@ export function methodologyToWordHtml(data: MethodologyData): string {
       </tbody>
     </table>
     <div class="section-box">
-      <strong>SEN Differentiation:</strong><br/>${escHtml(data.differentiationSen)}
+      <strong>${escHtml(t('method_sen_title'))}:</strong><br/>${escHtml(data.differentiationSen)}
     </div>
-    <p><strong>Formative Checks:</strong></p>
+    <p><strong>${escHtml(t('method_formative_title'))}:</strong></p>
     <ul>${data.formativeChecks.map((f) => `<li>${escHtml(f)}</li>`).join('')}</ul>
-    <p><strong>Recommended Local Materials:</strong></p>
+    <p><strong>${escHtml(t('method_materials_title'))}:</strong></p>
     <ul>${data.recommendedMaterials.map((m) => `<li>${escHtml(m)}</li>`).join('')}</ul>
   `;
 }

@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChatMessage, ChatThread, Lang } from '../types/ghad';
 import { AiClientError, requestAssistantReply } from '../services/aiClient';
 import { translate } from '../i18n/translations';
+import { buildAssistantHistory } from '../utils/assistantHistory';
 
 export type AssistantPhase = 'preparing' | 'generating' | 'slow' | 'retrying';
 
 export interface QueuedAssistantJob {
   id: string;
   threadId: string;
+  userMessageId?: string;
   text: string;
   skipAppendUser?: boolean;
   enqueuedAt: number;
@@ -23,6 +25,7 @@ export interface ActiveAssistantJob extends QueuedAssistantJob {
 
 export interface FailedAssistantJob {
   threadId: string;
+  userMessageId?: string;
   text: string;
   error: string;
 }
@@ -98,7 +101,7 @@ export function useAssistantQueue({
   }, [activeJob?.id]);
 
   const appendUserMessageToThread = useCallback(
-    (text: string, preferredThreadId: string | null): string => {
+    (text: string, preferredThreadId: string | null): { threadId: string; userMessageId: string } => {
       const now = new Date().toISOString();
       const currentThreads = [...threadsRef.current];
       const existing = preferredThreadId
@@ -147,7 +150,7 @@ export function useAssistantQueue({
       threadsRef.current = nextThreads;
       activeThreadIdRef.current = targetId;
       onUpdateThreadsRef.current(nextThreads, targetId);
-      return targetId;
+      return { threadId: targetId, userMessageId: userMsg.id };
     },
     []
   );
@@ -192,18 +195,22 @@ export function useAssistantQueue({
 
     // Ensure the user message exists in the target thread before calling AI
     let targetThreadId = nextJob.threadId;
+    let activeUserMsgId = nextJob.userMessageId;
     const threadExists = threadsRef.current.some((th) => th.id === targetThreadId);
     if (!nextJob.skipAppendUser || !threadExists) {
-      targetThreadId = appendUserMessageToThread(
+      const appended = appendUserMessageToThread(
         nextJob.text,
         threadExists ? targetThreadId : activeThreadIdRef.current
       );
+      targetThreadId = appended.threadId;
+      activeUserMsgId = appended.userMessageId;
     }
 
     if (mountedRef.current) {
       setActiveJob({
         ...nextJob,
         threadId: targetThreadId,
+        userMessageId: activeUserMsgId,
         phase: 'preparing',
         attempt: 1,
         maxAttempts: MAX_AUTO_ATTEMPTS,
@@ -239,22 +246,19 @@ export function useAssistantQueue({
           break;
         }
 
-        const priorMessages = currentThread.messages.filter(
-          (m) => m.text && m.text.trim() && !m.id.endsWith('_err')
+        const historyWithoutCurrent = buildAssistantHistory(
+          currentThread.messages,
+          activeUserMsgId
         );
-        const historyWithoutCurrent = priorMessages.slice(0, -1).map((m) => ({
-          role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
-          text: m.text.trim(),
-        }));
 
-        const rawReply = await requestAssistantReply({
+        const result = await requestAssistantReply({
           lang: langRef.current,
           message: nextJob.text,
           history: historyWithoutCurrent,
           signal: controller.signal,
         });
 
-        const reply = (typeof rawReply === 'string' ? rawReply : '').trim();
+        const reply = (result?.reply || '').trim();
         if (!reply) {
           throw new AiClientError('Assistant returned an empty response. Please click Retry.', 502);
         }
@@ -266,6 +270,7 @@ export function useAssistantQueue({
           role: 'bot',
           text: reply,
           timestamp: new Date().toISOString(),
+          ...(result.sources.length > 0 ? { sources: result.sources } : {}),
         };
 
         const latestThreads = threadsRef.current;
@@ -295,7 +300,12 @@ export function useAssistantQueue({
 
         const msg = err instanceof Error ? err.message : translate(langRef.current, 'toast_net');
         if (mountedRef.current) {
-          setFailedJob({ threadId: targetThreadId, text: nextJob.text, error: msg });
+          setFailedJob({
+            threadId: targetThreadId,
+            userMessageId: activeUserMsgId,
+            text: nextJob.text,
+            error: msg,
+          });
           onToastRef.current(`${translate(langRef.current, 'toast_net')}: ${msg}`, 'error');
         }
         break;
@@ -314,16 +324,22 @@ export function useAssistantQueue({
   }, [appendUserMessageToThread, waitCooldown]);
 
   const enqueueMessage = useCallback(
-    (rawText: string, opts?: { targetThreadId?: string | null; skipAppendUser?: boolean }) => {
+    (
+      rawText: string,
+      opts?: { targetThreadId?: string | null; skipAppendUser?: boolean; userMessageId?: string }
+    ) => {
       const text = rawText.trim();
       if (!text) return;
 
       const requestedThreadId = opts?.targetThreadId ?? activeThreadIdRef.current;
       let resolvedThreadId = requestedThreadId || '';
+      let resolvedUserMessageId = opts?.userMessageId;
 
       // If idle, append immediately to thread so UI feels instant; if already busy, hold in queuedJobs strip
       if (!processingRef.current && !opts?.skipAppendUser) {
-        resolvedThreadId = appendUserMessageToThread(text, requestedThreadId);
+        const appended = appendUserMessageToThread(text, requestedThreadId);
+        resolvedThreadId = appended.threadId;
+        resolvedUserMessageId = appended.userMessageId;
       } else if (!resolvedThreadId) {
         // Reserve or create an empty/named thread when queueing from a fresh chat
         const now = new Date().toISOString();
@@ -344,6 +360,7 @@ export function useAssistantQueue({
       const job: QueuedAssistantJob = {
         id: `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         threadId: resolvedThreadId,
+        userMessageId: resolvedUserMessageId,
         text,
         skipAppendUser: !processingRef.current || Boolean(opts?.skipAppendUser),
         enqueuedAt: Date.now(),
@@ -359,9 +376,9 @@ export function useAssistantQueue({
 
   const retryFailed = useCallback(() => {
     if (!failedJob) return;
-    const { threadId, text } = failedJob;
+    const { threadId, userMessageId, text } = failedJob;
     setFailedJob(null);
-    enqueueMessage(text, { targetThreadId: threadId, skipAppendUser: true });
+    enqueueMessage(text, { targetThreadId: threadId, skipAppendUser: true, userMessageId });
   }, [failedJob, enqueueMessage]);
 
   const retryNow = useCallback(() => {

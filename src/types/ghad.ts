@@ -1,5 +1,6 @@
-export type Lang = 'en' | 'rw' | 'fr';
+export type Lang = 'en' | 'rw' | 'fr' | 'sw';
 export type ThemeMode = 'auto' | 'light' | 'dark';
+export type GraphicsQuality = 'ultra' | 'low';
 export type ViewName =
   | 'dashboard'
   | 'lesson'
@@ -54,11 +55,17 @@ export interface SavedPlan {
   plan: LessonPlanData;
 }
 
+export interface GroundingSource {
+  title: string;
+  uri: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'bot';
   text: string;
   timestamp: string;
+  sources?: GroundingSource[];
 }
 
 export interface ChatThread {

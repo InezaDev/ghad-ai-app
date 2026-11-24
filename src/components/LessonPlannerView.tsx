@@ -310,7 +310,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
       };
 
       setPlanFromSelf(srsPlan);
-      onToast('Sample REB lesson plan loaded for Social & Religious Studies (SRS).', 'success');
+      onToast(t('toast_sample_loaded'), 'success');
       return;
     }
 
@@ -389,7 +389,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
       };
 
       setPlanFromSelf(samplePlan);
-      onToast('Sample REB lesson plan loaded.', 'success');
+      onToast(t('toast_sample_loaded'), 'success');
       return;
     }
 
@@ -455,7 +455,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
     };
 
     setPlanFromSelf(dynamicPlan);
-    onToast(`Sample REB lesson plan loaded for ${chosenSubject} (${chosenClass}).`, 'success');
+    onToast(t('toast_sample_loaded'), 'success');
   };
 
   const handleBlankTemplate = () => {
@@ -515,7 +515,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
       teacherSelfEvaluation: '',
     };
     setPlanFromSelf(blank);
-    onToast('Blank REB CBC template created.', 'info');
+    onToast(t('toast_blank_created'), 'info');
   };
 
   const handleCancelGenerate = () => {
@@ -523,7 +523,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
     abortRef.current = null;
     setRetryCountdown(null);
     setLoading(false);
-    onToast('Lesson plan generation cancelled.', 'info');
+    onToast(t('toast_gen_cancelled'), 'info');
   };
 
   const runLessonAi = async (mode: 'generate' | 'complete_missing') => {
@@ -691,7 +691,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
       </div>
 
       {/* Mobile Stacked Tabs */}
-      <div className="no-print xl:hidden flex items-center gap-1 p-1 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)]">
+      <div className="no-print holo-glass xl:hidden flex items-center gap-1 p-1 rounded-xl border border-[#38bdf8]/25">
         <button
           type="button"
           onClick={() => setMobileTab('setup')}
@@ -702,7 +702,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
           }`}
         >
           <SlidersHorizontal className="w-3.5 h-3.5" />
-          <span>1. Lesson Setup</span>
+          <span>{t('tab_setup')}</span>
         </button>
         <button
           type="button"
@@ -714,7 +714,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
           }`}
         >
           <FileText className="w-3.5 h-3.5" />
-          <span>2. REB Sheet {activePlan ? `(${activePlan.durationMinutes}m)` : ''}</span>
+          <span>{t('tab_sheet')} {activePlan ? `(${activePlan.durationMinutes}m)` : ''}</span>
         </button>
       </div>
 
@@ -728,7 +728,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
         >
           <form
             id="lessonForm"
-            className="p-5 sm:p-6 rounded-2xl bg-[var(--surface)] border border-[var(--border)] space-y-4"
+            className="holo-glass holo-reticle p-5 sm:p-6 rounded-2xl border border-[#38bdf8]/30 space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
               handleGenerate();
@@ -743,7 +743,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                   value={schoolName}
                   onChange={(e) => setSchoolName(e.target.value)}
                   disabled={loading}
-                  placeholder="e.g. GS Kigali"
+                  placeholder={t('lesson_ph_school')}
                   className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
                 />
               </label>
@@ -756,7 +756,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                   value={teacherName}
                   onChange={(e) => setTeacherName(e.target.value)}
                   disabled={loading}
-                  placeholder="e.g. Jean Bosco Mugisha"
+                  placeholder={t('lesson_ph_teacher')}
                   className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
                 />
               </label>
@@ -793,7 +793,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                     value={customSubject}
                     onChange={(e) => setCustomSubject(e.target.value)}
                     disabled={loading}
-                    placeholder="e.g. Fine Arts / Kiswahili"
+                    placeholder={t('lesson_ph_other_subj')}
                     className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
                   />
                 </label>
@@ -824,7 +824,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   disabled={loading}
-                  placeholder="e.g. Equity and Equality (or leave blank if Unit Title/Nº is given)"
+                  placeholder={t('lesson_ph_topic')}
                   className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
                 />
               </label>
@@ -837,7 +837,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                   value={unitNo}
                   onChange={(e) => setUnitNo(e.target.value)}
                   disabled={loading}
-                  placeholder="e.g. 3"
+                  placeholder={t('lesson_ph_unit')}
                   className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
                 />
               </label>
@@ -849,7 +849,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                   value={lessonNo}
                   onChange={(e) => setLessonNo(e.target.value)}
                   disabled={loading}
-                  placeholder="e.g. 1 of 4"
+                  placeholder={t('lesson_ph_lesson_no')}
                   className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
                 />
               </label>
@@ -861,7 +861,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                   value={unitTitle}
                   onChange={(e) => setUnitTitle(e.target.value)}
                   disabled={loading}
-                  placeholder="e.g. Fractions (auto-filled if blank)"
+                  placeholder={t('lesson_ph_unit_title')}
                   className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
                 />
               </label>
@@ -953,7 +953,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                   value={sen}
                   onChange={(e) => setSen(e.target.value)}
                   disabled={loading}
-                  placeholder="e.g. Slow learners (2), Mild visual impairment (1)"
+                  placeholder={t('lesson_ph_sen')}
                   className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
                 />
               </label>
@@ -966,7 +966,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                   value={extra}
                   onChange={(e) => setExtra(e.target.value)}
                   disabled={loading}
-                  placeholder="e.g. Include locally available materials…"
+                  placeholder={t('lesson_ph_extra')}
                   className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
                 />
               </label>
@@ -974,7 +974,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
 
             <div className="pt-2 space-y-2.5 border-t border-[var(--border)]">
               <p className="text-xs text-[var(--muted)]">
-                Enter Identification details above — AI automatically completes every missing REB section, objective, stage activity, and evaluation.
+                {t('lesson_autofill_hint')}
               </p>
               <button
                 id="generateLesson"
@@ -1019,7 +1019,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                 <div>
                   <div className="font-semibold">
                     {retryCountdown !== null
-                      ? `AI service is temporarily busy — retrying automatically in ${retryCountdown}s…`
+                      ? `${t('loading_retry_busy')} ${retryCountdown}s…`
                       : t('loading_lesson')}
                   </div>
                   <div className="text-xs text-[var(--muted)] mt-0.5">
@@ -1033,7 +1033,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--text)] hover:border-red-500 hover:text-red-600 transition-colors cursor-pointer"
               >
                 <Square className="w-3 h-3 fill-current" />
-                Cancel
+                {t('cancel_btn')}
               </button>
             </div>
           )}
@@ -1079,10 +1079,10 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
           {activePlan ? (
             <div
               id="lessonOutput"
-              className="print-only-area rounded-2xl bg-[var(--surface)] border border-[var(--border)] overflow-visible"
+              className="print-only-area holo-glass holo-reticle rounded-2xl border border-[#38bdf8]/30 overflow-visible"
             >
               {/* Sticky Top Toolbar */}
-              <div className="no-print sticky top-0 z-20 px-4 sm:px-5 py-3 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md rounded-t-2xl flex flex-wrap items-center justify-between gap-3">
+              <div className="no-print holo-glass sticky top-0 z-20 px-4 sm:px-5 py-3 border-b border-[#38bdf8]/25 rounded-t-2xl flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <strong data-i18n="out_lesson" className="font-display text-sm font-bold text-[var(--text)] truncate">
                     {t('out_lesson')}
@@ -1160,9 +1160,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
 
               {hasMissingPlanSections && !loading && (
                 <div className="no-print px-5 py-2.5 border-b border-[#0284C7]/30 bg-[#0284C7]/10 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--text)]">
-                  <span>
-                    Some REB sections are still blank after editing Identification. Let AI write all missing parts automatically while keeping your entries.
-                  </span>
+                  <span>{t('lesson_missing_banner')}</span>
                   <button
                     type="button"
                     onClick={handleCompleteMissing}
@@ -1177,13 +1175,13 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
               {planOutOfSyncWithForm && (
                 <div className="no-print px-5 py-2.5 border-b border-amber-200 dark:border-amber-800/70 bg-amber-50/80 dark:bg-amber-950/25 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-200">
                   <span>
-                    Showing plan for{' '}
+                    {t('lesson_sync_showing')}{' '}
                     <strong>
-                      {activePlan.subject} ({activePlan.classLevel}) — {activePlan.lessonTitle || 'Untitled'}
+                      {activePlan.subject} ({activePlan.classLevel}) — {activePlan.lessonTitle || t('lib_untitled')}
                     </strong>
-                    . Update to{' '}
+                    . {t('lesson_sync_update_to')}{' '}
                     <strong>
-                      {effectiveSubject} ({classLevel}) — {cleanTopicLabel(topic) || 'selected lesson'}
+                      {effectiveSubject} ({classLevel}) — {cleanTopicLabel(topic) || t('f_topic')}
                     </strong>
                     ?
                   </span>
@@ -1193,7 +1191,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md bg-[#F59E0B] text-white hover:bg-[#D97706] transition-colors cursor-pointer whitespace-nowrap"
                   >
                     <Sparkles className="w-3 h-3" />
-                    Update Lesson Plan
+                    {t('lesson_update_btn')}
                   </button>
                 </div>
               )}
@@ -1203,17 +1201,18 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
               </div>
             </div>
           ) : (
-            <div className="no-print p-8 sm:p-10 rounded-2xl bg-[var(--surface)] border border-dashed border-[var(--border)] text-center space-y-4">
+            <div className="no-print holo-glass holo-reticle p-8 sm:p-10 rounded-2xl border border-dashed border-[#38bdf8]/35 text-center space-y-4">
               <div className="w-12 h-12 rounded-xl bg-[#15803D]/10 text-[#15803D] dark:text-[#4ADE80] grid place-items-center mx-auto">
                 <FileText className="w-6 h-6" />
               </div>
               <div className="max-w-md mx-auto space-y-1.5">
                 <h2 className="font-display text-lg font-bold text-[var(--text)]">
-                  Official REB CBC Paper Sheet Preview
+                  {t('lesson_empty_title')}
                 </h2>
                 <p className="text-sm text-[var(--muted)]">
-                  Fill in your Subject, Class, and Lesson Title on the left and click{' '}
-                  <strong className="text-[var(--text)]">{t('btn_lesson')}</strong> — or load a sample or blank REB template immediately.
+                  {t('lesson_empty_desc_pre')}{' '}
+                  <strong className="text-[var(--text)]">{t('btn_lesson')}</strong>{' '}
+                  {t('lesson_empty_desc_post')}
                 </p>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">

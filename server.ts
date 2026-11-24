@@ -90,13 +90,13 @@ async function startServer() {
         return;
       }
 
-      const reply = await generateAssistantReply({
+      const result = await generateAssistantReply({
         language: body.language,
         message,
         history: body.history,
       });
 
-      res.json({ reply });
+      res.json({ reply: result.reply, sources: result.sources });
     } catch (err) {
       const { status, message } = normalizeError(err);
       res.status(status).json({ error: message });

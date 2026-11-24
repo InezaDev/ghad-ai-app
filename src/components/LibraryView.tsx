@@ -74,14 +74,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       </div>
 
       {/* Filter Toolbar */}
-      <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="holo-glass holo-reticle p-4 rounded-2xl border border-[#38bdf8]/30 grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="relative">
           <Search className="w-4 h-4 text-[var(--muted)] absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by title, subject, unit…"
+            placeholder={t('lib_search_ph')}
             className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
           />
         </div>
@@ -89,10 +89,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         <select
           value={subjectFilter}
           onChange={(e) => setSubjectFilter(e.target.value)}
-          aria-label="Filter by subject"
+          aria-label={t('lib_all_subjects')}
           className="px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
         >
-          <option value="ALL">All Subjects</option>
+          <option value="ALL">{t('lib_all_subjects')}</option>
           {subjects.map((s) => (
             <option key={s} value={s}>
               {s}
@@ -103,10 +103,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         <select
           value={classFilter}
           onChange={(e) => setClassFilter(e.target.value)}
-          aria-label="Filter by class"
+          aria-label={t('lib_all_classes')}
           className="px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
         >
-          <option value="ALL">All Classes (P1–S6)</option>
+          <option value="ALL">{t('lib_all_classes')}</option>
           {classes.map((c) => (
             <option key={c} value={c}>
               {c}
@@ -117,31 +117,31 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
       {/* Plans List */}
       {plans.length === 0 ? (
-        <div className="p-10 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-center space-y-3">
+        <div className="holo-glass holo-reticle p-10 rounded-2xl border border-[#38bdf8]/30 text-center space-y-3">
           <p className="font-display font-semibold text-base text-[var(--text)]">
-            No saved REB lesson plans yet
+            {t('lib_empty_title')}
           </p>
           <p className="text-sm text-[var(--muted)] max-w-md mx-auto">
-            Generate or customize a lesson plan in the Lesson Planner, then click Save to My Plans to store it here.
+            {t('lib_empty_desc')}
           </p>
           <button
             type="button"
             onClick={onCreateNew}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-[#15803D] text-white hover:bg-[#166534] cursor-pointer"
           >
-            Open Lesson Planner
+            {t('lib_open_planner')}
           </button>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="p-8 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-center text-sm text-[var(--muted)]">
-          No saved plans match your current search or filters.
+        <div className="holo-glass p-8 rounded-2xl border border-[#38bdf8]/25 text-center text-sm text-[var(--muted)]">
+          {t('lib_no_match')}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="perspective-stage grid grid-cols-1 md:grid-cols-2 gap-4">
           {filtered.map((item) => (
             <article
               key={item.id}
-              className="p-5 rounded-xl bg-[var(--surface)] border border-[var(--border)] flex flex-col justify-between gap-4"
+              className="holo-glass holo-reticle card-3d-tilt p-5 rounded-2xl border border-[#38bdf8]/25 flex flex-col justify-between gap-4"
             >
               <div>
                 <div className="text-xs text-[var(--muted)] flex flex-wrap items-center gap-2">
@@ -159,11 +159,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 </div>
 
                 <h3 className="mt-2 font-display text-base font-bold text-[var(--text)]">
-                  {item.plan.lessonTitle || 'Untitled Lesson'}
+                  {item.plan.lessonTitle || t('lib_untitled')}
                 </h3>
                 <p className="mt-1 text-xs text-[var(--muted)] line-clamp-2">
                   {item.plan.unitNo ? `${item.plan.unitNo} — ` : ''}
-                  {item.plan.keyUnitCompetence || item.plan.schoolName || 'REB CBC Lesson Plan'}
+                  {item.plan.keyUnitCompetence || item.plan.schoolName || t('out_lesson')}
                 </p>
               </div>
 
@@ -174,7 +174,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#15803D] text-white hover:bg-[#166534] transition-colors cursor-pointer"
                 >
                   <FolderOpen className="w-3.5 h-3.5" />
-                  Open &amp; Edit
+                  {t('lib_open_edit')}
                 </button>
                 <button
                   type="button"
@@ -182,7 +182,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[#15803D] transition-colors cursor-pointer"
                 >
                   <CopyPlus className="w-3.5 h-3.5" />
-                  Duplicate
+                  {t('lib_duplicate')}
                 </button>
                 <button
                   type="button"
@@ -190,7 +190,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[#15803D] transition-colors cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  Print
+                  {t('print_btn')}
                 </button>
                 <button
                   type="button"
@@ -198,7 +198,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   className="ml-auto inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  Delete
+                  {t('delete_short')}
                 </button>
               </div>
             </article>

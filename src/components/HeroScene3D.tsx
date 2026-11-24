@@ -2,6 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
+import { GraphicsQuality, Lang } from '../types/ghad';
+import { translate } from '../i18n/translations';
+
+interface HeroScene3DProps {
+  lang?: Lang;
+  graphicsQuality?: GraphicsQuality;
+}
 
 type CameraPreset = 'hero' | 'top' | 'detail';
 
@@ -145,9 +152,14 @@ function createContactShadowTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-export const HeroScene3D: React.FC = () => {
+export const HeroScene3D: React.FC<HeroScene3DProps> = ({
+  lang = 'en',
+  graphicsQuality = 'ultra',
+}) => {
+  const t = (k: string) => translate(lang, k);
   const mountRef = useRef<HTMLDivElement | null>(null);
   const presetRef = useRef<CameraPreset>('hero');
+  const qualityRef = useRef<GraphicsQuality>(graphicsQuality);
   const dragRotationRef = useRef({ yaw: 0, pitch: 0 });
   const isDraggingRef = useRef(false);
   const lastPointerRef = useRef({ x: 0, y: 0 });
@@ -155,6 +167,10 @@ export const HeroScene3D: React.FC = () => {
   const [preset, setPreset] = useState<CameraPreset>('hero');
   const [controlsOpen, setControlsOpen] = useState(true);
   const [webglUnavailable, setWebglUnavailable] = useState(false);
+
+  useEffect(() => {
+    qualityRef.current = graphicsQuality;
+  }, [graphicsQuality]);
 
   const selectPreset = (next: CameraPreset) => {
     presetRef.current = next;
@@ -181,8 +197,10 @@ export const HeroScene3D: React.FC = () => {
 
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
-    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+    renderer.toneMappingExposure = 1.12;
+    renderer.setPixelRatio(
+      isSoftwareGl || qualityRef.current === 'low' ? 1 : Math.min(window.devicePixelRatio || 1, 2)
+    );
     renderer.shadowMap.enabled = !isSoftwareGl;
     renderer.shadowMap.type = THREE.PCFShadowMap;
 
@@ -241,7 +259,24 @@ export const HeroScene3D: React.FC = () => {
       return m;
     };
 
-    // Soft contact shadow plane
+    // Soft contact shadow plane + Sci-Fi holographic grid deck
+    const holoGrid = new THREE.GridHelper(10, 20, 0x10b981, 0x0e3f3c);
+    holoGrid.position.y = -0.02;
+    const gridMat = holoGrid.material;
+    if (Array.isArray(gridMat)) {
+      gridMat.forEach((m) => {
+        m.transparent = true;
+        m.opacity = 0.45;
+        disposables.push(m);
+      });
+    } else {
+      gridMat.transparent = true;
+      gridMat.opacity = 0.45;
+      disposables.push(gridMat);
+    }
+    disposables.push(holoGrid.geometry);
+    scene.add(holoGrid);
+
     const contactShadow = new THREE.Mesh(
       trackGeo(new THREE.PlaneGeometry(4.2, 4.2)),
       trackMat(
@@ -583,11 +618,11 @@ export const HeroScene3D: React.FC = () => {
 
   if (webglUnavailable) {
     return (
-      <div className="w-full h-[320px] sm:h-[360px] rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] grid place-items-center p-6 text-center">
+      <div className="w-full h-[320px] sm:h-[360px] rounded-2xl border border-[#10b981]/30 bg-[#030712]/85 grid place-items-center p-6 text-center">
         <div className="space-y-1.5">
-          <div className="text-sm font-bold text-[var(--text)]">Interactive 3D REB CBC Showcase</div>
-          <p className="text-xs text-[var(--muted)]">
-            3D WebGL preview is unavailable on this device — all lesson planning tools work cleanly below.
+          <div className="text-sm font-bold text-slate-100">{t('hero_3d_unavailable_title')}</div>
+          <p className="text-xs text-slate-400">
+            {t('hero_3d_unavailable_desc')}
           </p>
         </div>
       </div>
@@ -595,10 +630,10 @@ export const HeroScene3D: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full h-[320px] sm:h-[370px] rounded-2xl border border-[var(--border)] bg-gradient-to-b from-[#0f172a] via-[#111c33] to-[#0f172a] overflow-hidden shadow-lg select-none">
+    <div className="relative w-full h-[320px] sm:h-[370px] rounded-2xl border border-[#38bdf8]/35 bg-gradient-to-b from-[#030712] via-[#071426] to-[#030712] overflow-hidden shadow-[0_0_28px_-10px_rgba(16,185,129,0.45)] select-none">
       {/* Top-left static spec label */}
-      <div className="pointer-events-none absolute top-3 left-3 z-10 px-2.5 py-1 rounded-md bg-[#0f172a]/90 border border-[#334155] text-[11px] font-semibold text-slate-100">
-        Interactive 3D CBC Folio · Drag to inspect
+      <div className="pointer-events-none absolute top-3 left-3 z-10 px-2.5 py-1 rounded-md bg-[#030712]/90 border border-[#10b981]/40 text-[11px] font-semibold text-emerald-300">
+        {t('hero_scene_label')}
       </div>
 
       {/* Isolated WebGL canvas mount */}
@@ -609,28 +644,28 @@ export const HeroScene3D: React.FC = () => {
         <button
           type="button"
           onClick={() => setControlsOpen((o) => !o)}
-          className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-semibold rounded-t-lg border border-b-0 border-[#334155] bg-[#1e293b] text-slate-200 hover:text-white cursor-pointer"
+          className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-semibold rounded-t-lg border border-b-0 border-[#38bdf8]/35 bg-[#0a1426] text-slate-200 hover:text-white cursor-pointer"
         >
           {controlsOpen ? (
             <>
               <ChevronDown className="w-3 h-3" />
-              <span>Hide 3D Controls</span>
+              <span>{t('hero_hide_controls')}</span>
             </>
           ) : (
             <>
               <ChevronUp className="w-3 h-3" />
-              <span>Show 3D Controls</span>
+              <span>{t('hero_show_controls')}</span>
             </>
           )}
         </button>
 
         {controlsOpen && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[#334155] bg-[#0f172a]/95 shadow-lg">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[#38bdf8]/35 bg-[#030712]/95 shadow-lg">
             {(
               [
-                { id: 'hero', label: '3D Folio' },
-                { id: 'top', label: 'Top Plan' },
-                { id: 'detail', label: 'CBC Rings' },
+                { id: 'hero', label: t('hero_preset_folio') },
+                { id: 'top', label: t('hero_preset_top') },
+                { id: 'detail', label: t('hero_preset_rings') },
               ] as const
             ).map((item) => (
               <button
@@ -639,8 +674,8 @@ export const HeroScene3D: React.FC = () => {
                 onClick={() => selectPreset(item.id)}
                 className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
                   preset === item.id
-                    ? 'bg-[#15803D] text-white'
-                    : 'bg-[#1e293b] text-slate-300 hover:text-white'
+                    ? 'bg-[#10b981] text-[#030712]'
+                    : 'bg-[#0f172a] text-slate-300 hover:text-white border border-slate-700/70'
                 }`}
               >
                 {item.label}
@@ -649,8 +684,8 @@ export const HeroScene3D: React.FC = () => {
             <button
               type="button"
               onClick={() => selectPreset('hero')}
-              title="Reset 3D angle"
-              className="p-1.5 rounded-lg bg-[#1e293b] text-slate-300 hover:text-white cursor-pointer"
+              title={t('hero_preset_folio')}
+              className="p-1.5 rounded-lg bg-[#0f172a] text-slate-300 hover:text-white border border-slate-700/70 cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>

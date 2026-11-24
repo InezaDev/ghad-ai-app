@@ -1,6 +1,7 @@
 import {
   AppBackup,
   ChatThread,
+  GraphicsQuality,
   Lang,
   SavedAssessment,
   SavedMethodology,
@@ -8,10 +9,12 @@ import {
   TeacherProfile,
   ThemeMode,
 } from '../types/ghad';
+import { normalizeGraphicsQuality } from './assistantHistory';
 
 const KEYS = {
   lang: 'ghad_lang',
   theme: 'ghad_theme',
+  graphics: 'ghad_graphics_quality',
   profile: 'ghad_profile',
   plans: 'ghad_plans',
   chats: 'ghad_chats',
@@ -41,7 +44,7 @@ function writeJson<T>(key: string, value: T): void {
 export function loadLang(): Lang {
   try {
     const v = localStorage.getItem(KEYS.lang);
-    if (v === 'en' || v === 'rw' || v === 'fr') return v;
+    if (v === 'en' || v === 'rw' || v === 'fr' || v === 'sw') return v;
   } catch {
     // ignore
   }
@@ -63,12 +66,28 @@ export function loadTheme(): ThemeMode {
   } catch {
     // ignore
   }
-  return 'auto';
+  return 'dark';
 }
 
 export function saveTheme(theme: ThemeMode): void {
   try {
     localStorage.setItem(KEYS.theme, theme);
+  } catch {
+    // ignore
+  }
+}
+
+export function loadGraphicsQuality(): GraphicsQuality {
+  try {
+    return normalizeGraphicsQuality(localStorage.getItem(KEYS.graphics));
+  } catch {
+    return 'ultra';
+  }
+}
+
+export function saveGraphicsQuality(quality: GraphicsQuality): void {
+  try {
+    localStorage.setItem(KEYS.graphics, normalizeGraphicsQuality(quality));
   } catch {
     // ignore
   }

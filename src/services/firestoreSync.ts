@@ -35,7 +35,7 @@ function clampStr(val: unknown, maxLen: number): string {
 }
 
 function normalizeLang(val: unknown): Lang {
-  return val === 'rw' || val === 'fr' ? val : 'en';
+  return val === 'rw' || val === 'fr' || val === 'sw' ? val : 'en';
 }
 
 function normalizeTheme(val: unknown): ThemeMode {
@@ -205,12 +205,29 @@ export async function saveChatToCloud(user: User, thread: ChatThread): Promise<v
   const validMessages = (Array.isArray(thread.messages) ? thread.messages : [])
     .filter((m) => m && typeof m.text === 'string' && m.text.trim().length > 0)
     .slice(-100)
-    .map((m, idx) => ({
-      id: sanitizeId(m.id || `msg_${idx}`, 'msg'),
-      role: m.role === 'user' ? 'user' : 'bot',
-      text: clampStr(m.text, 20000),
-      timestamp: clampStr(m.timestamp || new Date().toISOString(), 40),
-    }));
+    .map((m, idx) => {
+      const safeSources = Array.isArray(m.sources)
+        ? m.sources
+            .filter(
+              (s) =>
+                s &&
+                typeof s.uri === 'string' &&
+                (s.uri.startsWith('https://') || s.uri.startsWith('http://'))
+            )
+            .slice(0, 10)
+            .map((s) => ({
+              title: clampStr(s.title || s.uri, 200),
+              uri: clampStr(s.uri, 1000),
+            }))
+        : [];
+      return {
+        id: sanitizeId(m.id || `msg_${idx}`, 'msg'),
+        role: m.role === 'user' ? 'user' : 'bot',
+        text: clampStr(m.text, 20000),
+        timestamp: clampStr(m.timestamp || new Date().toISOString(), 40),
+        ...(safeSources.length > 0 ? { sources: safeSources } : {}),
+      };
+    });
 
   try {
     const snap = await getDoc(ref);

@@ -37,7 +37,7 @@ service cloud.firestore {
     }
 
     function isValidLang(val) {
-      return val is string && val.size() <= 5 && val in ['en', 'rw', 'fr'];
+      return val is string && val.size() <= 5 && val in ['en', 'rw', 'fr', 'sw'];
     }
 
     function isValidTheme(val) {

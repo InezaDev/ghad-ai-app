@@ -67,7 +67,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
     abortRef.current = null;
     setRetryCountdown(null);
     setLoading(false);
-    onToast('Assessment generation cancelled.', 'info');
+    onToast(t('toast_gen_cancelled'), 'info');
   };
 
   const handleGenerate = async () => {
@@ -152,7 +152,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
     const next = history.filter((item) => item.id !== id);
     onSaveHistory(next);
     if (active?.id === id) setActive(next[0] ?? null);
-    onToast('Assessment removed from history.', 'info');
+    onToast(t('assess_deleted'), 'info');
   };
 
   return (
@@ -168,7 +168,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
 
       <form
         id="assessmentForm"
-        className="no-print p-6 rounded-xl bg-[var(--surface)] border border-[var(--border)] space-y-4"
+        className="no-print holo-glass holo-reticle p-6 rounded-2xl border border-[#38bdf8]/30 space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
           handleGenerate();
@@ -183,7 +183,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               disabled={loading}
-              placeholder="e.g. Biology"
+              placeholder={t('assess_ph_subject')}
               className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
             />
           </label>
@@ -195,7 +195,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
               value={classLevel}
               onChange={(e) => setClassLevel(e.target.value)}
               disabled={loading}
-              placeholder="e.g. S2"
+              placeholder={t('assess_ph_class')}
               className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
             />
           </label>
@@ -207,7 +207,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               disabled={loading}
-              placeholder="e.g. Photosynthesis"
+              placeholder={t('assess_ph_topic')}
               className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
             />
           </label>
@@ -287,11 +287,11 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
             <div>
               <div className="font-semibold">
                 {retryCountdown !== null
-                  ? `AI service is temporarily busy — retrying automatically in ${retryCountdown}s…`
+                  ? `${t('loading_retry_busy')} ${retryCountdown}s…`
                   : t('loading_assess')}
               </div>
               <div className="text-xs text-[var(--muted)] mt-0.5">
-                {subject} · {classLevel} · {topic} ({count} questions)
+                {subject} · {classLevel} · {topic} ({count} {t('assess_questions_short')})
               </div>
             </div>
           </div>
@@ -301,7 +301,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--text)] hover:border-red-500 hover:text-red-600 transition-colors cursor-pointer"
           >
             <Square className="w-3 h-3 fill-current" />
-            Cancel
+            {t('cancel_btn')}
           </button>
         </div>
       )}
@@ -341,7 +341,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
       {active?.data && (
         <div
           id="assessmentOutput"
-          className="print-only-area rounded-xl bg-[var(--surface)] border border-[var(--border)] overflow-hidden"
+          className="print-only-area holo-glass holo-reticle rounded-2xl border border-[#38bdf8]/30 overflow-hidden"
         >
           <div className="no-print px-5 py-3.5 border-b border-[var(--border)] bg-[var(--surface-subtle)] flex flex-wrap items-center justify-between gap-3">
             <strong data-i18n="out_assess" className="font-display text-sm font-bold text-[var(--text)]">
@@ -365,7 +365,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                       '_'
                     ),
                     title: active.data.title || 'REB CBC Assessment',
-                    innerHtml: assessmentToWordHtml(active.data, showAnswers),
+                    innerHtml: assessmentToWordHtml(active.data, showAnswers, lang),
                     onNotify: onToast,
                   })
                 }
@@ -377,7 +377,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
               <button
                 id="copyAssessment"
                 type="button"
-                onClick={() => onCopy(assessmentToPlainText(active.data, showAnswers))}
+                onClick={() => onCopy(assessmentToPlainText(active.data, showAnswers, lang))}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[#15803D] transition-colors cursor-pointer whitespace-nowrap"
               >
                 <Copy className="w-3.5 h-3.5" />
@@ -389,7 +389,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                   downloadWordDoc(
                     `Assessment_${active.subject}_${active.classLevel}`.replace(/[^a-zA-Z0-9_-]+/g, '_'),
                     active.data.title,
-                    assessmentToWordHtml(active.data, showAnswers)
+                    assessmentToWordHtml(active.data, showAnswers, lang)
                   )
                 }
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[#15803D] transition-colors cursor-pointer whitespace-nowrap"
@@ -411,11 +411,11 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                 <span>{active.classLevel}</span>
                 <span aria-hidden="true">·</span>
                 <span className="font-mono-tabular font-semibold">
-                  Total Marks: {active.data.totalMarks}
+                  {t('assess_total_marks')}: {active.data.totalMarks}
                 </span>
               </div>
               <p className="mt-3 text-sm text-[var(--text)]">
-                <strong>Instructions:</strong> {active.data.instructions}
+                <strong>{t('assess_instructions')}:</strong> {active.data.instructions}
               </p>
             </div>
 
@@ -428,7 +428,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                       {q.question}
                     </p>
                     <span className="font-mono-tabular text-xs font-semibold text-[var(--muted)] shrink-0">
-                      [{q.marks} pts]
+                      [{q.marks} {t('assess_pts')}]
                     </span>
                   </div>
                   {(q.options ?? []).length > 0 && (
@@ -445,17 +445,17 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
             {showAnswers && (
               <div className="pt-5 border-t border-[var(--border)] space-y-3">
                 <h3 className="font-display text-base font-bold text-[#15803D] dark:text-[#4ade80]">
-                  Answer Key &amp; Marking Scheme
+                  {t('assess_answer_key_title')}
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border-collapse border border-[var(--border)]">
                     <thead>
                       <tr className="bg-[var(--surface-subtle)]">
                         <th className="border border-[var(--border)] px-3 py-2 text-left w-12">#</th>
-                        <th className="border border-[var(--border)] px-3 py-2 text-left">Answer</th>
-                        <th className="border border-[var(--border)] px-3 py-2 text-left w-20">Marks</th>
+                        <th className="border border-[var(--border)] px-3 py-2 text-left">{t('assess_col_answer')}</th>
+                        <th className="border border-[var(--border)] px-3 py-2 text-left w-20">{t('assess_col_marks')}</th>
                         <th className="border border-[var(--border)] px-3 py-2 text-left">
-                          Marking Notes
+                          {t('assess_col_notes')}
                         </th>
                       </tr>
                     </thead>
@@ -486,18 +486,18 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
       )}
 
       {/* Recent Assessment History */}
-      <div className="no-print rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+      <div className="no-print holo-glass rounded-2xl border border-[#38bdf8]/25 overflow-hidden">
         <div className="px-5 py-3.5 border-b border-[var(--border)] flex items-center justify-between">
           <span className="inline-flex items-center gap-2 font-display text-sm font-bold text-[var(--text)]">
             <History className="w-4 h-4 text-[#15803D]" />
-            Recent Assessment History
+            {t('assess_history_title')}
           </span>
-          <span className="text-xs font-mono-tabular text-[var(--muted)]">{safeHistory.length} saved</span>
+          <span className="text-xs font-mono-tabular text-[var(--muted)]">{safeHistory.length} {t('saved_label')}</span>
         </div>
 
         {safeHistory.length === 0 ? (
           <div className="p-5 text-sm text-[var(--muted)]">
-            Generated assessments are saved here automatically for quick review and printing.
+            {t('assess_history_empty')}
           </div>
         ) : (
           <div className="divide-y divide-[var(--border)]">
@@ -508,7 +508,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
               >
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-[var(--text)] truncate">
-                    {item.data?.title || item.topic || 'Assessment'}
+                    {item.data?.title || item.topic || t('nav_assessment')}
                   </div>
                   <div className="text-xs text-[var(--muted)] flex items-center gap-2 mt-0.5">
                     <span>{item.subject}</span>
@@ -526,13 +526,13 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                     onClick={() => setActive(item)}
                     className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:border-[#15803D] cursor-pointer"
                   >
-                    View
+                    {t('view_btn')}
                   </button>
                   <button
                     type="button"
-                    onClick={() => onCopy(assessmentToPlainText(item.data, true))}
+                    onClick={() => onCopy(assessmentToPlainText(item.data, true, lang))}
                     className="p-1.5 text-[var(--muted)] hover:text-[var(--text)] cursor-pointer"
-                    title="Copy"
+                    title={t('copy_short')}
                   >
                     <Copy className="w-4 h-4" />
                   </button>
@@ -547,13 +547,13 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                             '_'
                           ),
                           title: item.data.title || 'REB CBC Assessment',
-                          innerHtml: assessmentToWordHtml(item.data, true),
+                          innerHtml: assessmentToWordHtml(item.data, true, lang),
                           onNotify: onToast,
                         });
                       }, 100);
                     }}
                     className="p-1.5 text-[var(--muted)] hover:text-[var(--text)] cursor-pointer"
-                    title="Print"
+                    title={t('print_btn')}
                   >
                     <Printer className="w-4 h-4" />
                   </button>
@@ -561,7 +561,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                     type="button"
                     onClick={() => deleteItem(item.id)}
                     className="p-1.5 text-[var(--muted)] hover:text-red-600 cursor-pointer"
-                    title="Delete"
+                    title={t('delete_short')}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

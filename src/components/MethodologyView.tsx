@@ -61,7 +61,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
     abortRef.current = null;
     setRetryCountdown(null);
     setLoading(false);
-    onToast('Methodology generation cancelled.', 'info');
+    onToast(t('toast_gen_cancelled'), 'info');
   };
 
   const handleGenerate = async () => {
@@ -141,7 +141,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
     const next = history.filter((item) => item.id !== id);
     onSaveHistory(next);
     if (active?.id === id) setActive(next[0] ?? null);
-    onToast('Methodology guide deleted from history.', 'info');
+    onToast(t('method_deleted'), 'info');
   };
 
   return (
@@ -157,7 +157,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
 
       <form
         id="methodologyForm"
-        className="no-print p-6 rounded-xl bg-[var(--surface)] border border-[var(--border)] space-y-4"
+        className="no-print holo-glass holo-reticle p-6 rounded-2xl border border-[#38bdf8]/30 space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
           handleGenerate();
@@ -172,7 +172,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               disabled={loading}
-              placeholder="e.g. Chemistry"
+              placeholder={t('method_ph_subject')}
               className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
             />
           </label>
@@ -184,7 +184,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
               value={classLevel}
               onChange={(e) => setClassLevel(e.target.value)}
               disabled={loading}
-              placeholder="e.g. S3"
+              placeholder={t('method_ph_class')}
               className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
             />
           </label>
@@ -196,7 +196,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               disabled={loading}
-              placeholder="e.g. Acids and Bases"
+              placeholder={t('method_ph_topic')}
               className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
             />
           </label>
@@ -235,7 +235,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
             <div>
               <div className="font-semibold">
                 {retryCountdown !== null
-                  ? `AI service is temporarily busy — retrying automatically in ${retryCountdown}s…`
+                  ? `${t('loading_retry_busy')} ${retryCountdown}s…`
                   : t('loading_method')}
               </div>
               <div className="text-xs text-[var(--muted)] mt-0.5">
@@ -249,7 +249,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--text)] hover:border-red-500 hover:text-red-600 transition-colors cursor-pointer"
           >
             <Square className="w-3 h-3 fill-current" />
-            Cancel
+            {t('cancel_btn')}
           </button>
         </div>
       )}
@@ -288,7 +288,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
       {active?.data && (
         <div
           id="methodologyOutput"
-          className="print-only-area rounded-xl bg-[var(--surface)] border border-[var(--border)] overflow-hidden"
+          className="print-only-area holo-glass holo-reticle rounded-2xl border border-[#38bdf8]/30 overflow-hidden"
         >
           <div className="no-print px-5 py-3.5 border-b border-[var(--border)] bg-[var(--surface-subtle)] flex flex-wrap items-center justify-between gap-3">
             <strong data-i18n="out_method" className="font-display text-sm font-bold text-[var(--text)]">
@@ -304,7 +304,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
                       '_'
                     ),
                     title: active.data.title || 'REB CBC Methodology Guide',
-                    innerHtml: methodologyToWordHtml(active.data),
+                    innerHtml: methodologyToWordHtml(active.data, lang),
                     onNotify: onToast,
                   })
                 }
@@ -316,7 +316,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
               <button
                 id="copyMethodology"
                 type="button"
-                onClick={() => onCopy(methodologyToPlainText(active.data))}
+                onClick={() => onCopy(methodologyToPlainText(active.data, lang))}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[#15803D] transition-colors cursor-pointer whitespace-nowrap"
               >
                 <Copy className="w-3.5 h-3.5" />
@@ -328,7 +328,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
                   downloadWordDoc(
                     `Methodology_${active.subject}_${active.classLevel}`.replace(/[^a-zA-Z0-9_-]+/g, '_'),
                     active.data.title,
-                    methodologyToWordHtml(active.data)
+                    methodologyToWordHtml(active.data, lang)
                   )
                 }
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[#15803D] transition-colors cursor-pointer whitespace-nowrap"
@@ -352,7 +352,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
                 <span>{active.topic}</span>
               </div>
               <p className="mt-3 text-sm text-[var(--text)] leading-relaxed">
-                <strong>Core CBC Approach:</strong> {active.data.coreApproach}
+                <strong>{t('method_core_approach')}:</strong> {active.data.coreApproach}
               </p>
             </div>
 
@@ -360,11 +360,11 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
               <table className="w-full text-sm border-collapse border border-[var(--border)]">
                 <thead>
                   <tr className="bg-[var(--surface-subtle)]">
-                    <th className="border border-[var(--border)] px-3 py-2 text-left">Strategy</th>
-                    <th className="border border-[var(--border)] px-3 py-2 text-left w-24">Timing</th>
-                    <th className="border border-[var(--border)] px-3 py-2 text-left">Description</th>
-                    <th className="border border-[var(--border)] px-3 py-2 text-left">Teacher Role</th>
-                    <th className="border border-[var(--border)] px-3 py-2 text-left">Learner Role</th>
+                    <th className="border border-[var(--border)] px-3 py-2 text-left">{t('method_col_strategy')}</th>
+                    <th className="border border-[var(--border)] px-3 py-2 text-left w-24">{t('method_col_timing')}</th>
+                    <th className="border border-[var(--border)] px-3 py-2 text-left">{t('method_col_desc')}</th>
+                    <th className="border border-[var(--border)] px-3 py-2 text-left">{t('method_col_teacher')}</th>
+                    <th className="border border-[var(--border)] px-3 py-2 text-left">{t('method_col_learner')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -383,17 +383,17 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
               </table>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-[var(--border)]">
-              <div>
+            <div className="perspective-stage grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-[var(--border)]">
+              <div className="holo-glass card-3d-tilt p-4 rounded-xl border border-[#38bdf8]/20">
                 <h3 className="font-display text-sm font-bold text-[var(--text)] mb-2">
-                  Inclusive SEN Differentiation
+                  {t('method_sen_title')}
                 </h3>
                 <p className="text-sm text-[var(--muted)] leading-relaxed">
                   {active.data.differentiationSen}
                 </p>
 
                 <h3 className="font-display text-sm font-bold text-[var(--text)] mt-4 mb-2">
-                  Formative Assessment Checks
+                  {t('method_formative_title')}
                 </h3>
                 <ul className="list-disc pl-5 space-y-1 text-sm text-[var(--text)]">
                   {(active.data.formativeChecks ?? []).map((f, i) => (
@@ -402,9 +402,9 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
                 </ul>
               </div>
 
-              <div>
+              <div className="holo-glass card-3d-tilt p-4 rounded-xl border border-[#10b981]/25">
                 <h3 className="font-display text-sm font-bold text-[var(--text)] mb-2">
-                  Locally Available Teaching Materials
+                  {t('method_materials_title')}
                 </h3>
                 <ul className="list-disc pl-5 space-y-1 text-sm text-[var(--text)]">
                   {(active.data.recommendedMaterials ?? []).map((m, i) => (
@@ -418,18 +418,18 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
       )}
 
       {/* Recent History */}
-      <div className="no-print rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+      <div className="no-print holo-glass rounded-2xl border border-[#38bdf8]/25 overflow-hidden">
         <div className="px-5 py-3.5 border-b border-[var(--border)] flex items-center justify-between">
           <span className="inline-flex items-center gap-2 font-display text-sm font-bold text-[var(--text)]">
             <History className="w-4 h-4 text-[#15803D]" />
-            Recent Methodology History
+            {t('method_history_title')}
           </span>
-          <span className="text-xs font-mono-tabular text-[var(--muted)]">{safeHistory.length} saved</span>
+          <span className="text-xs font-mono-tabular text-[var(--muted)]">{safeHistory.length} {t('saved_label')}</span>
         </div>
 
         {safeHistory.length === 0 ? (
           <div className="p-5 text-sm text-[var(--muted)]">
-            Generated teaching methodology guides are saved here automatically.
+            {t('method_history_empty')}
           </div>
         ) : (
           <div className="divide-y divide-[var(--border)]">
@@ -440,7 +440,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
               >
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-[var(--text)] truncate">
-                    {item.data?.title || item.topic || 'Methodology Guide'}
+                    {item.data?.title || item.topic || t('nav_methodology')}
                   </div>
                   <div className="text-xs text-[var(--muted)] flex items-center gap-2 mt-0.5">
                     <span>{item.subject}</span>
@@ -458,13 +458,13 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
                     onClick={() => setActive(item)}
                     className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:border-[#15803D] cursor-pointer"
                   >
-                    View
+                    {t('view_btn')}
                   </button>
                   <button
                     type="button"
-                    onClick={() => onCopy(methodologyToPlainText(item.data))}
+                    onClick={() => onCopy(methodologyToPlainText(item.data, lang))}
                     className="p-1.5 text-[var(--muted)] hover:text-[var(--text)] cursor-pointer"
-                    title="Copy"
+                    title={t('copy_short')}
                   >
                     <Copy className="w-4 h-4" />
                   </button>
@@ -479,13 +479,13 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
                             '_'
                           ),
                           title: item.data.title || 'REB CBC Methodology Guide',
-                          innerHtml: methodologyToWordHtml(item.data),
+                          innerHtml: methodologyToWordHtml(item.data, lang),
                           onNotify: onToast,
                         });
                       }, 100);
                     }}
                     className="p-1.5 text-[var(--muted)] hover:text-[var(--text)] cursor-pointer"
-                    title="Print"
+                    title={t('print_btn')}
                   >
                     <Printer className="w-4 h-4" />
                   </button>
@@ -493,7 +493,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
                     type="button"
                     onClick={() => deleteItem(item.id)}
                     className="p-1.5 text-[var(--muted)] hover:text-red-600 cursor-pointer"
-                    title="Delete"
+                    title={t('delete_short')}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

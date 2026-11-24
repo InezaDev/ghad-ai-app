@@ -1,8 +1,8 @@
 import { GenerateContentParameters, GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 
-export type SupportedLang = 'en' | 'rw' | 'fr';
+export type SupportedLang = 'en' | 'rw' | 'fr' | 'sw';
 
-const MODEL_CHAIN = ['gemini-4-hydrogen', 'gemini-3.1-flash-lite'] as const;
+const MODEL_CHAIN = ['gemini-2.5-flash', 'gemini-4-hydrogen', 'gemini-3.1-flash-lite'] as const;
 
 export class AiServiceHttpError extends Error {
   status: number;
@@ -109,7 +109,9 @@ function buildConfigForModel(
 ): GenerateContentParameters['config'] {
   if (!baseConfig) return baseConfig;
   const nextConfig = { ...baseConfig };
-  if (model === 'gemini-3.1-flash-lite') {
+  if (model === 'gemini-2.5-flash') {
+    delete nextConfig.thinkingConfig;
+  } else if (model === 'gemini-3.1-flash-lite') {
     nextConfig.thinkingConfig = { thinkingLevel: ThinkingLevel.MINIMAL };
   } else {
     nextConfig.thinkingConfig = { thinkingLevel: ThinkingLevel.LOW };
@@ -298,10 +300,27 @@ const CBC_LOCALIZATION: Record<
     typeMap: { mcq: 'Questions à Choix Multiple (4 options A–D)', short: 'Questions à Réponse Courte', mixed: 'Mixte (QCM et Réponses Courtes)' },
     defaultLocation: 'Dans la salle de classe — apprenants répartis en groupes hétérogènes.',
   },
+  sw: {
+    languageName: 'Kiswahili (Swahili)',
+    curriculumHeader: 'Mtaala unaozingatia Umahiri wa Bodi ya Elimu ya Msingi Rwanda (REB CBC)',
+    introName: 'Utangulizi',
+    devName: 'Mwendelezo wa Somo',
+    conclName: 'Hitimisho',
+    objectiveGuidance:
+      'Lengo la Somo (Instructional Objective) LAZIMA liandikwe katika sentensi MOJA rasmi ya Kiswahili iliyo na sehemu zote 4 za REB CBC: (1) Hali/Vifaa ("Kwa kutumia..."), (2) Nani ("wanafunzi wa..."), (3) Kitendo kinachopimika ("wataweza kueleza / kutatua / kuonyesha"), na (4) Kiwango/Kigezo ("kwa usahihi usiopungua 80%").',
+    competencesList:
+      'Fikra tunduizi (Critical thinking), Ubunifu na uvumbuzi (Creativity), Utafiti na utatuzi wa matatizo (Problem solving), Mawasiliano (Communication), Ushirikiano na stadi za maisha (Cooperation), Kujifunza maishani (Lifelong learning).',
+    crossCuttingList:
+      'Masomo ya Mauaji ya Kimbari, Mazingira na maendeleo endelevu, Usawa wa kijinsia, Elimu kamili ya afya ya uzazi, Amani na maadili, Elimu ya fedha, Utamaduni wa viwango, Elimu jumuishi.',
+    termMap: { 'Term 1': 'Muhula wa 1', 'Term 2': 'Muhula wa 2', 'Term 3': 'Muhula wa 3' },
+    difficultyMap: { easy: 'Rahisi (Kukumbuka na Kuelewa)', medium: 'Wastani (Kutumia na Kuchambua)', hard: 'Ngumu (Kutathmini na Kuunda)' },
+    typeMap: { mcq: 'Maswali ya Kuchagua Jibu Sahihi (A–D)', short: 'Maswali ya Majibu Mafupi', mixed: 'Mchanganyiko (Kuchagua na Majibu Mafupi)' },
+    defaultLocation: 'Ndani ya darasa — wanafunzi wamekaa katika vikundi mchanganyiko.',
+  },
 };
 
 function resolveLang(lang?: string): SupportedLang {
-  if (lang === 'rw' || lang === 'fr') return lang;
+  if (lang === 'rw' || lang === 'fr' || lang === 'sw') return lang;
   return 'en';
 }
 
@@ -489,7 +508,7 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
     hasPartialDraft
       ? `PRESERVE & COMPLETE MODE: Keep all accurate teacher-provided Identification and any complete non-empty section text verbatim (fixing only obvious typos if needed), and richly write every field marked [MISSING - AI MUST WRITE].`
       : '',
-    `TOPIC-SPECIFICITY RULE: Every field (Unit Title, Key Unit Competence, Instructional Objective, Learning Materials, References, Activity Overview, all 3 Stages, and Self-Evaluation) MUST be specifically tailored to "${subjectInput}" (${classInput}) and the lesson "${rawTopicInput || unitTitleInput || `Unit ${unitNoInput} Lesson ${lessonNoInput}`}". Never copy generic examples from other subjects.`,
+    `TOPIC-SPECIFICITY RULE (CRITICAL): Every single field — Unit Title, Key Unit Competence, Instructional Objective, Learning Materials, References, Activity Overview, all 3 Stages (Introduction, Development, Conclusion), and Self-Evaluation — MUST be uniquely crafted for Subject "${subjectInput}", Grade/Class "${classInput}", and Lesson Title/Topic "${rawTopicInput || unitTitleInput || `Unit ${unitNoInput} Lesson ${lessonNoInput}`}". NEVER reuse generic template phrasing. Include real domain terminology, concrete examples, topic-specific diagnostic questions, subject-specific teaching aids, and authentic exercises for ${subjectInput} at ${classInput} level.`,
     `NUMBERING RULE (MANDATORY FOR ALL STAGES): In BOTH "teacherActivities" AND "learnerActivities" across Introduction, Development, AND Conclusion, you MUST write clearly numbered sequential steps on separate lines ("1. ...", "2. ...", "3. ...") showing the first action, second action, and third action.`,
     `EXACT OFFICIAL REB SECTION RULES:`,
     `1. "schoolName": Use the teacher's provided school name ("${schoolInput || 'GS Kigali'}") if given, else a realistic Rwandan school placeholder like "GS Kigali". Never leave blank or "—".`,
@@ -498,28 +517,28 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
     `4. "unitTitle": The official REB syllabus unit title for ${subjectInput} ${classInput}.`,
     `5. "lessonNo": Format as "X of Y" ("${lessonNoInput}").`,
     `6. "sen": Special Educational Needs category AND number of learners ("${senInput}").`,
-    `7. "keyUnitCompetence": Official broad REB competence for the unit ("To be able to...").`,
-    `8. "lessonTitle": Specific, correctly spelled title of this lesson.`,
+    `7. "keyUnitCompetence": Official broad REB competence for the unit in ${cbc.languageName}.`,
+    `8. "lessonTitle": Specific, correctly spelled title of this lesson in ${cbc.languageName}.`,
     `9. "instructionalObjective": ${cbc.objectiveGuidance}`,
-    `10. "planLocation": State location ("Inside the classroom" or "Outside the classroom") AND seating/grouping arrangement.`,
-    `11. "learningMaterials": Concrete teaching/learning aids FOR ALL LEARNERS (including adapted aids for SEN learners).`,
+    `10. "planLocation": State location and seating/grouping arrangement in ${cbc.languageName}.`,
+    `11. "learningMaterials": Concrete, topic-specific teaching/learning aids FOR ALL LEARNERS (including adapted aids for SEN learners) in ${cbc.languageName}.`,
     `12. "references": Specific REB syllabus, Teacher's Guide, and Learner's Book references for ${subjectInput} ${classInput}.`,
-    `13. "activityOverview": Concise 1–2 sentence overview summarizing the learner-centred approach across this lesson.`,
+    `13. "activityOverview": Concise 1–2 sentence overview summarizing the learner-centred approach tailored specifically to "${rawTopicInput || unitTitleInput}" in ${cbc.languageName}.`,
     `14. "stages": MUST contain EXACTLY 3 stages (or match the teacher's existing stage rows if >3):`,
     `    - Stage 1 (stageType: "intro", stageName: "${cbc.introName}", timingMinutes: ${introMin}):`,
-    `      * teacherActivities: Numbered steps ("1. ...", "2. ...", "3. ...") — greet learners & verify SEN seating, 2 diagnostic prior-knowledge questions, introduce lesson title.`,
-    `      * learnerActivities: Matching numbered steps ("1. ...", "2. ...", "3. ...") — respond, answer prior questions, write lesson title.`,
+    `      * teacherActivities: Numbered steps ("1. ...", "2. ...", "3. ...") — greet learners & verify SEN seating, 2 specific diagnostic prior-knowledge questions about ${rawTopicInput || subjectInput}, introduce the exact lesson title.`,
+    `      * learnerActivities: Matching numbered steps ("1. ...", "2. ...", "3. ...") — respond, answer those specific prior questions, write lesson title.`,
     `      * competencesAndIssues: Specific Generic Competences + Cross-Cutting Issues + short explanation of how addressed in Introduction.`,
     `    - Stage 2 (stageType: "development", stageName: "${cbc.devName}", timingMinutes: ${devMin}):`,
-    `      * teacherActivities: Numbered steps ("1. Discovery / Group Activity: ...", "2. Group Presentation & Synthesis: ...", "3. Guided Practice & Consolidation: ...") adapted for ${devMin} minutes (richer multi-part tasks when duration is 80 min!).`,
-    `      * learnerActivities: Matching numbered steps ("1. ...", "2. ...", "3. ...") showing active learner collaboration, presentation, and guided exercises.`,
-    `      * competencesAndIssues: Generic Competences (${cbc.competencesList}) + Cross-Cutting Issues (${cbc.crossCuttingList}) + short explanation.`,
+    `      * teacherActivities: Numbered steps ("1. ...", "2. ...", "3. ...") tailored specifically to "${rawTopicInput || unitTitleInput}" in ${subjectInput} (${classInput}) for ${devMin} minutes — include concrete topic-specific discovery tasks, synthesis points, and differentiated exercises.`,
+    `      * learnerActivities: Matching numbered steps ("1. ...", "2. ...", "3. ...") showing active learner collaboration, specific topic observations/calculations, presentation, and guided exercises.`,
+    `      * competencesAndIssues: Generic Competences (${cbc.competencesList}) + Cross-Cutting Issues (${cbc.crossCuttingList}) + short explanation tied to the topic.`,
     `    - Stage 3 (stageType: "conclusion", stageName: "${cbc.conclName}", timingMinutes: ${conclMin}):`,
-    `      * teacherActivities: Numbered steps ("1. Lesson Summary: ...", "2. Formative Evaluation: ...", "3. Feedback & Homework: ...") with 2–3 concrete assessment questions.`,
-    `      * learnerActivities: Matching numbered steps ("1. ...", "2. ...", "3. ...") summarizing, answering exit questions, copying homework.`,
+    `      * teacherActivities: Numbered steps ("1. ...", "2. ...", "3. ...") — summary of key topic takeaways, 2–3 concrete exit assessment questions on "${rawTopicInput || unitTitleInput}", and specific REB homework.`,
+    `      * learnerActivities: Matching numbered steps ("1. ...", "2. ...", "3. ...") summarizing topic concepts, answering the exit questions, copying homework.`,
     `      * competencesAndIssues: Generic Competences & Cross-Cutting Issues + short explanation.`,
-    `15. "teacherSelfEvaluation": Practical post-lesson self-evaluation note aligned to the lesson objective and ${targetDuration}-minute timing.`,
-    `COMPLETENESS RULE: Every single field MUST be richly completed with concrete Rwandan CBC classroom content. Never output blank strings, "—", "...", or "N/A".`,
+    `15. "teacherSelfEvaluation": Practical post-lesson self-evaluation note aligned to the specific lesson objective and ${targetDuration}-minute timing.`,
+    `COMPLETENESS RULE: Every single field MUST be richly completed with concrete Rwandan CBC classroom content 100% in ${cbc.languageName}. Never output blank strings, "—", "...", or "N/A".`,
     `TIMING RULE: The sum of timingMinutes across all stages MUST equal EXACTLY ${targetDuration} minutes.`,
   ]
     .filter(Boolean)
@@ -527,8 +546,8 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
 
   const userPrompt = [
     hasPartialDraft
-      ? `Complete all missing sections and produce a full, finalized Rwanda REB CBC lesson plan in ${cbc.languageName} from this Identification & draft:`
-      : `Generate a complete, authentic Rwanda REB CBC lesson plan in ${cbc.languageName}:`,
+      ? `Complete all missing sections and produce a full, finalized Rwanda REB CBC lesson plan 100% in ${cbc.languageName} from this Identification & draft:`
+      : `Generate a complete, authentic, topic-specific Rwanda REB CBC lesson plan 100% in ${cbc.languageName}:`,
     `- School Name: ${schoolInput || 'GS Kigali (or keep teacher-supplied school)'}`,
     `- Teacher Name: ${teacherInput || 'Teacher'}`,
     `- Term: ${localizedTerm}`,
@@ -549,97 +568,93 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
     .join('\n');
 
   const ai = getAiClient();
-  let parsed: Record<string, unknown> = {};
-  if (ai) {
-    try {
-      const response = await generateWithResilience(ai, {
-        contents: userPrompt,
-        config: {
-          systemInstruction,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              schoolName: { type: Type.STRING },
-              teacherName: { type: Type.STRING },
-              term: { type: Type.STRING },
-              date: { type: Type.STRING },
-              subject: { type: Type.STRING },
-              classLevel: { type: Type.STRING },
-              unitNo: { type: Type.STRING },
-              lessonNo: { type: Type.STRING },
-              durationMinutes: { type: Type.INTEGER },
-              classSize: { type: Type.STRING },
-              sen: { type: Type.STRING },
-              unitTitle: { type: Type.STRING },
-              keyUnitCompetence: { type: Type.STRING },
-              lessonTitle: { type: Type.STRING },
-              instructionalObjective: { type: Type.STRING },
-              planLocation: { type: Type.STRING },
-              learningMaterials: { type: Type.STRING },
-              references: { type: Type.STRING },
-              activityOverview: { type: Type.STRING },
-              stages: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    stageType: {
-                      type: Type.STRING,
-                      description: 'Must be one of: intro, development, conclusion',
-                    },
-                    stageName: { type: Type.STRING },
-                    timingMinutes: { type: Type.INTEGER },
-                    teacherActivities: { type: Type.STRING },
-                    learnerActivities: { type: Type.STRING },
-                    competencesAndIssues: { type: Type.STRING },
-                  },
-                  required: [
-                    'stageType',
-                    'stageName',
-                    'timingMinutes',
-                    'teacherActivities',
-                    'learnerActivities',
-                    'competencesAndIssues',
-                  ],
+  const response = await generateWithResilience(ai, {
+    contents: userPrompt,
+    config: {
+      systemInstruction,
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          schoolName: { type: Type.STRING },
+          teacherName: { type: Type.STRING },
+          term: { type: Type.STRING },
+          date: { type: Type.STRING },
+          subject: { type: Type.STRING },
+          classLevel: { type: Type.STRING },
+          unitNo: { type: Type.STRING },
+          lessonNo: { type: Type.STRING },
+          durationMinutes: { type: Type.INTEGER },
+          classSize: { type: Type.STRING },
+          sen: { type: Type.STRING },
+          unitTitle: { type: Type.STRING },
+          keyUnitCompetence: { type: Type.STRING },
+          lessonTitle: { type: Type.STRING },
+          instructionalObjective: { type: Type.STRING },
+          planLocation: { type: Type.STRING },
+          learningMaterials: { type: Type.STRING },
+          references: { type: Type.STRING },
+          activityOverview: { type: Type.STRING },
+          stages: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                stageType: {
+                  type: Type.STRING,
+                  description: 'Must be one of: intro, development, conclusion',
                 },
+                stageName: { type: Type.STRING },
+                timingMinutes: { type: Type.INTEGER },
+                teacherActivities: { type: Type.STRING },
+                learnerActivities: { type: Type.STRING },
+                competencesAndIssues: { type: Type.STRING },
               },
-              teacherSelfEvaluation: { type: Type.STRING },
+              required: [
+                'stageType',
+                'stageName',
+                'timingMinutes',
+                'teacherActivities',
+                'learnerActivities',
+                'competencesAndIssues',
+              ],
             },
-            required: [
-              'schoolName',
-              'teacherName',
-              'term',
-              'date',
-              'subject',
-              'classLevel',
-              'unitNo',
-              'unitTitle',
-              'lessonNo',
-              'durationMinutes',
-              'classSize',
-              'sen',
-              'keyUnitCompetence',
-              'lessonTitle',
-              'instructionalObjective',
-              'planLocation',
-              'learningMaterials',
-              'references',
-              'activityOverview',
-              'stages',
-              'teacherSelfEvaluation',
-            ],
           },
+          teacherSelfEvaluation: { type: Type.STRING },
         },
-      });
-      parsed = parseJsonSafely<Record<string, unknown>>(response.text || '', 'lesson plan');
-    } catch (err) {
-      console.warn('[GHAD AI] Using robust offline REB CBC fallback for lesson plan:', err);
-    }
-  }
+        required: [
+          'schoolName',
+          'teacherName',
+          'term',
+          'date',
+          'subject',
+          'classLevel',
+          'unitNo',
+          'unitTitle',
+          'lessonNo',
+          'durationMinutes',
+          'classSize',
+          'sen',
+          'keyUnitCompetence',
+          'lessonTitle',
+          'instructionalObjective',
+          'planLocation',
+          'learningMaterials',
+          'references',
+          'activityOverview',
+          'stages',
+          'teacherSelfEvaluation',
+        ],
+      },
+    },
+  });
+  const parsed = parseJsonSafely<Record<string, unknown>>(response.text || '', 'lesson plan');
 
   const rawStages = Array.isArray(parsed.stages) ? (parsed.stages as Array<Record<string, unknown>>) : [];
+  if (rawStages.length === 0) {
+    throw new AiServiceHttpError(502, 'AI returned a lesson plan without stages. Please click Retry.');
+  }
 
   const finalSubject = pickMeaningful(input.subject, parsed.subject, subjectInput || 'Subject');
   const finalClass = pickMeaningful(input.classLevel, parsed.classLevel, classInput || 'P4');
@@ -681,6 +696,7 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
     aiStage: Record<string, unknown> | undefined,
     existingStage:
       | {
+          id?: string;
           stageName?: string;
           timingMinutes?: number;
           teacherActivities?: string;
@@ -689,7 +705,8 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
         }
       | undefined,
     fallbackName: string,
-    fallbackMin: number
+    fallbackMin: number,
+    stageIndex = 0
   ) => {
     const fb = stageFallback(type, finalLessonTitle);
     const teacherRaw = pickMeaningful(
@@ -708,6 +725,7 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
       fb.comp
     );
     return {
+      id: existingStage?.id || `stage_${Date.now()}_${type}_${stageIndex}`,
       stageType: type,
       stageName: pickMeaningful(existingStage?.stageName, aiStage?.stageName, fallbackName),
       timingMinutes:
@@ -742,7 +760,8 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
       aiDevStages[idx],
       exDevStages[idx],
       devCount > 1 ? `${cbc.devName} (${idx + 1})` : cbc.devName,
-      perDevFallback
+      perDevFallback,
+      idx
     )
   );
 
@@ -821,22 +840,33 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
   };
 }
 
+export interface GroundingSource {
+  title: string;
+  uri: string;
+}
+
 export interface AssistantTurnInput {
   language?: string;
   message: string;
   history?: Array<{ role: string; text: string }>;
 }
 
-export async function generateAssistantReply(input: AssistantTurnInput): Promise<string> {
+export interface AssistantTurnOutput {
+  reply: string;
+  sources: GroundingSource[];
+}
+
+export async function generateAssistantReply(input: AssistantTurnInput): Promise<AssistantTurnOutput> {
   const lang = resolveLang(input.language);
   const cbc = CBC_LOCALIZATION[lang];
   const ai = getAiClient();
 
   const systemInstruction = [
-    `You are GHAD AI, an expert teaching assistant built for Rwandan teachers (Primary P1–P6 and Secondary S1–S6) under the ${cbc.curriculumHeader}.`,
-    `STRICT LANGUAGE RULE: Respond strictly in ${cbc.languageName}, translating any curriculum terminology accurately for Rwandan classrooms.`,
-    'Provide complete, practical, learner-centred answers, clear explanations, examples grounded in Rwandan schools, and actionable classroom steps. Never cut an explanation short.',
-    'Format responses cleanly with short headings and bullet points for quick reading.',
+    `You are GHAD AI, an authoritative teaching and subject-matter assistant for Rwandan teachers (Primary P1–P6 and Secondary S1–S6) aligned with the ${cbc.curriculumHeader}.`,
+    `DIRECT ANSWER RULE: Directly, concretely, and authoritatively answer the exact question the user asked from the very first sentence. Do NOT open with generic welcome scripts, self-introductions, or generic "3 Core Stages" lesson-plan boilerplate unless the user specifically asks about lesson-plan stages.`,
+    `When the user asks a subject-matter or curriculum question (for example: "tell me ten importance of food", biology, chemistry, math, social studies, or classroom pedagogy), immediately provide clear, accurate, factual points aligned with Rwanda REB CBC.`,
+    `STRICT LANGUAGE RULE: Respond 100% in ${cbc.languageName}. Every heading, numbered list, bullet point, and explanation MUST be written cleanly and naturally in ${cbc.languageName}.`,
+    `FORMATTING RULE: Format answers in clean Markdown using headings (###), **bold** labels, numbered lists, and bullet points.`,
   ].join('\n');
 
   const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
@@ -857,6 +887,7 @@ export async function generateAssistantReply(input: AssistantTurnInput): Promise
     config: {
       systemInstruction,
       thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      tools: [{ googleSearch: {} }],
     },
   });
 
@@ -864,7 +895,31 @@ export async function generateAssistantReply(input: AssistantTurnInput): Promise
   if (!reply) {
     throw new AiServiceHttpError(502, 'Gemini returned an empty assistant response.');
   }
-  return reply;
+
+  const groundingChunks =
+    response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+  const seenUris = new Set<string>();
+  const sources: GroundingSource[] = [];
+
+  for (const chunk of groundingChunks) {
+    const uri = chunk?.web?.uri?.trim();
+    if (!uri || (!uri.startsWith('https://') && !uri.startsWith('http://')) || seenUris.has(uri)) {
+      continue;
+    }
+    seenUris.add(uri);
+    let title = chunk?.web?.title?.trim() || '';
+    if (!title) {
+      try {
+        title = new URL(uri).hostname.replace(/^www\./, '');
+      } catch {
+        title = uri;
+      }
+    }
+    sources.push({ title, uri });
+    if (sources.length >= 10) break;
+  }
+
+  return { reply, sources };
 }
 
 export interface GenerateAssessmentInput {
@@ -887,7 +942,7 @@ export async function generateRebAssessment(input: GenerateAssessmentInput) {
 
   const systemInstruction = [
     `You are an assessment specialist for the ${cbc.curriculumHeader}.`,
-    `STRICT LANGUAGE RULE: Translate and generate EVERY field (title, instructions, questions, options, answers, and marking notes) strictly in ${cbc.languageName}.`,
+    `STRICT LANGUAGE RULE: Translate and generate EVERY SINGLE field (title, instructions, questions, options, answers, and marking notes) 100% in ${cbc.languageName}.`,
     `Align every question to Rwanda CBC competence-based assessment standards and Bloom’s taxonomy. Generate ALL ${questionCount} questions completely with accurate answers and marking scheme notes.`,
   ].join('\n');
 
@@ -988,7 +1043,7 @@ export async function generateRebMethodology(input: GenerateMethodologyInput) {
 
   const systemInstruction = [
     `You are a pedagogy advisor for the ${cbc.curriculumHeader} specializing in learner-centred active teaching methodologies.`,
-    `STRICT LANGUAGE RULE: Translate and generate EVERY field strictly in ${cbc.languageName}.`,
+    `STRICT LANGUAGE RULE: Translate and generate EVERY SINGLE field 100% in ${cbc.languageName}.`,
     'Focus on active discovery, collaborative group work, think-pair-share, inclusive SEN differentiation, formative checks, and locally available low-cost teaching materials in Rwandan schools.',
   ].join('\n');
 

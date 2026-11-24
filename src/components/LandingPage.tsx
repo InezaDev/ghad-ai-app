@@ -16,7 +16,7 @@ import {
   WifiOff,
   Zap,
 } from 'lucide-react';
-import { Lang, ViewName } from '../types/ghad';
+import { GraphicsQuality, Lang, ViewName } from '../types/ghad';
 import { translate } from '../i18n/translations';
 import { HeroScene3D } from './HeroScene3D';
 
@@ -60,6 +60,7 @@ const SUBJECT_SAMPLE_MAP: Record<string, { unit: string; title: string; intro: s
 
 interface LandingPageProps {
   lang: Lang;
+  graphicsQuality?: GraphicsQuality;
   user: User | null;
   onChangeLang: (lang: Lang) => void;
   onLaunch: (view: ViewName) => void;
@@ -70,6 +71,7 @@ interface LandingPageProps {
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   lang,
+  graphicsQuality = 'ultra',
   user,
   onChangeLang,
   onLaunch,
@@ -101,15 +103,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   };
 
   return (
-    <div id="landingPage" className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+    <div id="landingPage" className="relative z-10 min-h-screen bg-transparent text-[var(--text)]">
       {/* Top Bar Contract: Brand wordmark — 4 concise nav links — Primary action */}
-      <header className="border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4 sm:gap-8">
+      <header className="holo-glass border-b border-[#38bdf8]/25 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-8">
           <a
             href="#top"
-            className="flex items-center gap-2.5 font-display font-bold text-lg tracking-tight text-[var(--text)] whitespace-nowrap shrink-0"
+            className="flex items-center gap-2 font-display font-bold text-base sm:text-lg tracking-tight text-[var(--text)] whitespace-nowrap shrink-0"
           >
-            <span className="w-8 h-8 rounded-lg bg-[#15803D] text-white grid place-items-center font-bold text-base shadow-sm">
+            <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-[#10b981] to-[#0284c7] text-[#030712] grid place-items-center font-extrabold text-sm sm:text-base shadow-[0_0_16px_-4px_rgba(16,185,129,0.7)]">
               G
             </span>
             <span>GHAD AI</span>
@@ -146,17 +148,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </a>
           </nav>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0">
             <select
               id="lang"
               aria-label={t('lang_label')}
               value={lang}
               onChange={(e) => onChangeLang(e.target.value as Lang)}
-              className="px-2.5 py-2 text-xs sm:text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
+              className="max-w-[92px] sm:max-w-none px-2 sm:px-2.5 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
             >
               <option value="en">English</option>
               <option value="rw">Ikinyarwanda</option>
               <option value="fr">Français</option>
+              <option value="sw">Kiswahili</option>
             </select>
 
             {user ? (
@@ -177,10 +180,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <button
                 type="button"
                 onClick={() => onOpenAuth('signin')}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-semibold text-[var(--text)] bg-[var(--surface)] border border-[var(--border)] hover:border-[#15803D] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                title={t('auth_sign_in')}
+                aria-label={t('auth_sign_in')}
+                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-[var(--text)] bg-[var(--surface)] border border-[var(--border)] hover:border-[#15803D] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <LogIn className="w-4 h-4" />
-                <span data-i18n="auth_sign_in">{t('auth_sign_in')}</span>
+                <LogIn className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline" data-i18n="auth_sign_in">{t('auth_sign_in')}</span>
               </button>
             )}
 
@@ -189,7 +194,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               type="button"
               data-i18n="open_workspace"
               onClick={() => onLaunch('dashboard')}
-              className="px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-[#15803D] hover:bg-[#166534] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-[#15803D] hover:bg-[#166534] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               {t('open_workspace')}
             </button>
@@ -254,10 +259,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               {/* Interactive Quick-Try Bar */}
               <form
                 onSubmit={handleQuickTry}
-                className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-sm space-y-3"
+                className="holo-glass holo-reticle p-4 rounded-xl border border-[#38bdf8]/30 space-y-3"
               >
                 <div className="flex items-center justify-between gap-2 text-xs font-semibold text-[var(--muted)]">
-                  <span>Quick-Try: Launch pre-filled REB Lesson Planner</span>
+                  <span>{t('quick_try_title')}</span>
                   <span className="text-[#0284C7] dark:text-[#38BDF8]">P1–S6</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
@@ -289,7 +294,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     type="submit"
                     className="sm:col-span-3 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-[#0284C7] hover:bg-[#0369A1] rounded-lg transition-colors whitespace-nowrap cursor-pointer"
                   >
-                    <span>Start</span>
+                    <span>{t('quick_try_start')}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -299,21 +304,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {/* Right Column: Interactive 3D CBC Showcase + Live REB Lesson Plan Preview */}
             <div className="lg:col-span-6 perspective-stage">
               <div className="relative">
-                <div className="card-3d-depth p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)]">
+                <div className="holo-glass holo-reticle card-3d-depth p-4 sm:p-5 rounded-2xl border border-[#38bdf8]/35">
                   {/* Top capabilities & 3D/Sheet switcher */}
                   <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-[var(--border)] text-xs font-semibold">
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="inline-flex items-center gap-1.5 text-[#15803D] dark:text-[#4ADE80]">
                         <Zap className="w-3.5 h-3.5 text-[#F59E0B]" />
-                        Ready in 10s
+                        {t('cap_ready')}
                       </span>
                       <span className="hidden sm:inline-flex items-center gap-1.5 text-[#0284C7] dark:text-[#38BDF8]">
                         <Printer className="w-3.5 h-3.5" />
-                        Print PDF &amp; Word
+                        {t('cap_print')}
                       </span>
                       <span className="hidden sm:inline-flex items-center gap-1.5 text-[var(--muted)]">
                         <WifiOff className="w-3.5 h-3.5" />
-                        Offline Ready
+                        {t('cap_offline')}
                       </span>
                     </div>
 
@@ -328,7 +333,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         }`}
                       >
                         <Box className="w-3 h-3" />
-                        <span>3D Studio</span>
+                        <span>{t('tab_3d')}</span>
                       </button>
                       <button
                         type="button"
@@ -340,13 +345,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         }`}
                       >
                         <FileText className="w-3 h-3" />
-                        <span>REB Sheet</span>
+                        <span>{t('tab_reb_sheet')}</span>
                       </button>
                     </div>
                   </div>
 
                   {heroShowcaseTab === '3d' ? (
-                    <HeroScene3D />
+                    <HeroScene3D lang={lang} graphicsQuality={graphicsQuality} />
                   ) : (
                     /* Miniature Official REB A4 Paper Sheet */
                     <div className="bg-white text-[#0F172A] rounded-md border border-[#CBD5E1] p-3 sm:p-4 text-[11px] leading-snug shadow-sm">
@@ -447,27 +452,27 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="mt-12 pt-8 border-t border-[var(--border)] grid grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
               <strong className="font-display text-2xl sm:text-3xl font-bold text-[var(--text)] font-mono-tabular block">
-                3 Languages
+                {t('stat_4_langs')}
               </strong>
-              <span className="text-sm text-[var(--muted)]">English · Ikinyarwanda · Français</span>
+              <span className="text-sm text-[var(--muted)]">{t('stat_langs_list')}</span>
             </div>
             <div>
               <strong className="font-display text-2xl sm:text-3xl font-bold text-[var(--text)] font-mono-tabular block">
-                4 AI Tools
+                {t('stat_tools_num')}
               </strong>
-              <span className="text-sm text-[var(--muted)]">Planner · Assistant · Tests · Guide</span>
+              <span className="text-sm text-[var(--muted)]">{t('stat_tools_list')}</span>
             </div>
             <div>
               <strong className="font-display text-2xl sm:text-3xl font-bold text-[var(--text)] font-mono-tabular block">
                 P1–S6
               </strong>
-              <span className="text-sm text-[var(--muted)]">Primary, O-Level &amp; A-Level</span>
+              <span className="text-sm text-[var(--muted)]">{t('stat_levels_sub')}</span>
             </div>
             <div>
               <strong className="font-display text-2xl sm:text-3xl font-bold text-[#15803D] dark:text-[#4ADE80] block">
-                Free for Teachers
+                {t('stat_free_title')}
               </strong>
-              <span className="text-sm text-[var(--muted)]">Official REB CBC Format &amp; Export</span>
+              <span className="text-sm text-[var(--muted)]">{t('stat_free_sub')}</span>
             </div>
           </div>
         </div>
@@ -492,7 +497,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           ].map((step) => (
             <article
               key={step.num}
-              className="card-3d-depth p-6 rounded-xl bg-[var(--surface)] border border-[var(--border)] flex flex-col gap-3"
+              className="holo-glass holo-reticle card-3d-tilt p-6 rounded-xl border border-[#38bdf8]/25 flex flex-col gap-3"
             >
               <span className={`font-mono-tabular text-sm font-bold ${step.accent}`}>{step.num}</span>
               <h3 data-i18n={step.tk} className="font-display text-lg font-bold text-[var(--text)]">
@@ -507,7 +512,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* 4-Tool Bento Showcase */}
-      <section id="toolkit" className="bg-[var(--surface-subtle)] border-y border-[var(--border)]">
+      <section id="toolkit" className="bg-[#030712]/35 border-y border-[#38bdf8]/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
           <div className="max-w-2xl mb-10">
             <h2 data-i18n="tools_title" className="font-display text-2xl sm:text-3xl font-bold text-[var(--text)]">
@@ -523,7 +528,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <button
               type="button"
               onClick={() => onLaunch('lesson')}
-              className="card-3d-depth lg:col-span-7 text-left p-6 rounded-2xl bg-[var(--surface)] border border-[var(--border)] hover:border-[#15803D] flex flex-col justify-between gap-5 cursor-pointer"
+              className="holo-glass holo-reticle card-3d-tilt lg:col-span-7 text-left p-6 rounded-2xl border border-[#38bdf8]/25 hover:border-[#10b981] flex flex-col justify-between gap-5 cursor-pointer"
             >
               <div className="space-y-3">
                 <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#15803D] to-[#0284C7] text-white grid place-items-center">
@@ -557,7 +562,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <button
               type="button"
               onClick={() => onLaunch('assistant')}
-              className="card-3d-depth lg:col-span-5 text-left p-6 rounded-2xl bg-[var(--surface)] border border-[var(--border)] hover:border-[#0284C7] flex flex-col justify-between gap-5 cursor-pointer"
+              className="holo-glass holo-reticle card-3d-tilt lg:col-span-5 text-left p-6 rounded-2xl border border-[#38bdf8]/25 hover:border-[#38bdf8] flex flex-col justify-between gap-5 cursor-pointer"
             >
               <div className="space-y-3">
                 <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#0284C7] to-[#15803D] text-white grid place-items-center">
@@ -583,7 +588,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <button
               type="button"
               onClick={() => onLaunch('assessment')}
-              className="card-3d-depth lg:col-span-6 text-left p-6 rounded-2xl bg-[var(--surface)] border border-[var(--border)] hover:border-[#F59E0B] flex flex-col justify-between gap-5 cursor-pointer"
+              className="holo-glass holo-reticle card-3d-tilt lg:col-span-6 text-left p-6 rounded-2xl border border-[#38bdf8]/25 hover:border-[#f59e0b] flex flex-col justify-between gap-5 cursor-pointer"
             >
               <div className="space-y-3">
                 <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white grid place-items-center">
@@ -597,7 +602,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </p>
                 <div className="p-3 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--muted)] flex items-center justify-between gap-2">
                   <span>Q1. Compare equity &amp; equality [4 pts]</span>
-                  <span className="font-semibold text-[#15803D] dark:text-[#4ADE80]">Marking Key</span>
+                  <span className="font-semibold text-[#15803D] dark:text-[#4ADE80]">{t('bento_marking_key')}</span>
                 </div>
               </div>
               <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#D97706] dark:text-[#FBBF24]">
@@ -610,7 +615,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <button
               type="button"
               onClick={() => onLaunch('methodology')}
-              className="card-3d-depth lg:col-span-6 text-left p-6 rounded-2xl bg-[var(--surface)] border border-[var(--border)] hover:border-[#15803D] flex flex-col justify-between gap-5 cursor-pointer"
+              className="holo-glass holo-reticle card-3d-tilt lg:col-span-6 text-left p-6 rounded-2xl border border-[#38bdf8]/25 hover:border-[#10b981] flex flex-col justify-between gap-5 cursor-pointer"
             >
               <div className="space-y-3">
                 <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#15803D] to-[#F59E0B] text-white grid place-items-center">
@@ -626,7 +631,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <span>Think-Pair-Share · Role-Play · Group Inquiry</span>
                   <span className="inline-flex items-center gap-1 text-[#0284C7] dark:text-[#38BDF8] font-semibold">
                     <FileText className="w-3.5 h-3.5" />
-                    SEN Ready
+                    {t('bento_sen_ready')}
                   </span>
                 </div>
               </div>
@@ -644,10 +649,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
           <div>
             <h2 className="font-display text-2xl font-bold text-[var(--text)] mb-3">
-              Official Rwanda REB CBC Structure
+              {t('reb_highlight_title')}
             </h2>
             <p className="text-sm text-[var(--muted)] mb-6">
-              Every lesson plan includes all mandatory Rwanda Basic Education Board sections, inline cell editing, stage timing verification, and A4 print &amp; Word formatting.
+              {t('reb_highlight_sub')}
             </p>
             <ul className="space-y-3 text-sm text-[var(--text)]">
               {(['trust_1', 'trust_2', 'trust_3', 'trust_4'] as const).map((key) => (
@@ -659,7 +664,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </ul>
           </div>
 
-          <div id="portals" className="p-6 rounded-2xl bg-[var(--surface)] border border-[var(--border)]">
+          <div id="portals" className="holo-glass holo-reticle p-6 rounded-2xl border border-[#38bdf8]/30">
             <h3 data-i18n="res_title" className="font-display text-lg font-bold text-[var(--text)] mb-1">
               {t('res_title')}
             </h3>
@@ -668,16 +673,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </p>
             <div className="divide-y divide-[var(--border)]">
               {[
-                { name: 'Rwanda Basic Education Board (REB)', url: 'https://www.reb.gov.rw' },
-                { name: 'REB e-Learning Platform', url: 'https://elearning.reb.rw' },
-                { name: 'Ministry of Education (MINEDUC)', url: 'https://www.mineduc.gov.rw' },
+                { name: t('res_reb_title'), url: 'https://www.reb.gov.rw' },
+                { name: t('res_elearn_title'), url: 'https://elearning.reb.rw' },
+                { name: t('res_mineduc_title'), url: 'https://www.mineduc.gov.rw' },
               ].map((link) => (
                 <a
                   key={link.url}
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="py-3 flex items-center justify-between text-sm font-medium text-[var(--text)] hover:text-[#15803D] dark:hover:text-[#4ADE80] transition-colors"
+                  className="py-3 flex items-center justify-between text-sm font-medium text-[var(--text)] hover:text-[#10b981] transition-colors"
                 >
                   <span>{link.name}</span>
                   <ArrowRight className="w-4 h-4 text-[var(--muted)]" />
@@ -689,7 +694,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-[var(--border)] py-8 px-6 text-center text-sm text-[var(--muted)]">
+      <footer className="holo-glass border-t border-[#38bdf8]/20 py-8 px-6 text-center text-sm text-[var(--muted)]">
         <p className="font-medium text-[var(--text)]">
           GHAD AI — <span data-i18n="footer_line">{t('footer_line')}</span>
         </p>

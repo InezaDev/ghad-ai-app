@@ -20,29 +20,29 @@ interface AuthModalProps {
   onSuccess: (msg: string) => void;
 }
 
-function mapAuthError(err: unknown): string {
+function mapAuthError(err: unknown, t: (k: string) => string): string {
   const code = (err as { code?: string })?.code || '';
   switch (code) {
     case 'auth/operation-not-allowed':
-      return 'Email/Password sign-in is not enabled yet in Firebase Console (Authentication → Sign-in method → Enable Email/Password). Google Sign-In works right away!';
+      return t('auth_err_op_not_allowed');
     case 'auth/email-already-in-use':
-      return 'An account with this email already exists. Try signing in instead.';
+      return t('auth_err_email_in_use');
     case 'auth/invalid-email':
-      return 'Please enter a valid email address.';
+      return t('auth_err_invalid_email');
     case 'auth/weak-password':
-      return 'Password should be at least 6 characters long.';
+      return t('auth_err_weak_pass');
     case 'auth/user-not-found':
     case 'auth/wrong-password':
     case 'auth/invalid-credential':
-      return 'Invalid email or password. Please check and try again.';
+      return t('auth_err_invalid_cred');
     case 'auth/popup-closed-by-user':
-      return 'Google sign-in popup was closed before finishing.';
+      return t('auth_err_popup_closed');
     case 'auth/popup-blocked':
-      return 'Popup was blocked by your browser. Please allow popups for this site.';
+      return t('auth_err_popup_blocked');
     case 'auth/too-many-requests':
-      return 'Too many attempts. Please wait a moment and try again.';
+      return t('auth_err_too_many');
     default:
-      return err instanceof Error ? err.message : 'Authentication failed. Please try again.';
+      return err instanceof Error ? err.message : t('auth_err_generic');
   }
 }
 
@@ -81,7 +81,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onSuccess(t('auth_google_success'));
       onClose();
     } catch (err) {
-      setErrorMsg(mapAuthError(err));
+      setErrorMsg(mapAuthError(err, t));
     } finally {
       setBusy(false);
     }
@@ -94,7 +94,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const cleanName = fullName.trim();
 
     if (!cleanEmail || !cleanPass) {
-      setErrorMsg('Please enter both email and password.');
+      setErrorMsg(t('auth_err_missing_fields'));
       return;
     }
 
@@ -105,7 +105,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       if (mode === 'register') {
         if (cleanPass.length < 6) {
-          setErrorMsg('Password must be at least 6 characters.');
+          setErrorMsg(t('auth_err_pass_min'));
           setBusy(false);
           return;
         }
@@ -126,7 +126,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onClose();
       }
     } catch (err) {
-      setErrorMsg(mapAuthError(err));
+      setErrorMsg(mapAuthError(err, t));
     } finally {
       setBusy(false);
     }
@@ -135,7 +135,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleResetPassword = async () => {
     const cleanEmail = email.trim();
     if (!cleanEmail) {
-      setErrorMsg('Enter your email address above first, then click Forgot password.');
+      setErrorMsg(t('auth_err_enter_email_reset'));
       return;
     }
     setBusy(true);
@@ -143,9 +143,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setInfoMsg(null);
     try {
       await sendPasswordResetEmail(auth, cleanEmail);
-      setInfoMsg('Password reset link sent to your email address.');
+      setInfoMsg(t('auth_reset_sent'));
     } catch (err) {
-      setErrorMsg(mapAuthError(err));
+      setErrorMsg(mapAuthError(err, t));
     } finally {
       setBusy(false);
     }
@@ -156,9 +156,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label={t('auth_title')}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#030712]/70 backdrop-blur-md p-4"
     >
-      <div className="w-full max-w-md rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xl overflow-hidden">
+      <div className="holo-glass holo-reticle w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
         <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
           <div>
             <h2 className="font-display text-lg font-bold text-[var(--text)]">

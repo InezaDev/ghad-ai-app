@@ -64,7 +64,7 @@
         },
         "lang": {
           "type": "string",
-          "enum": ["en", "rw", "fr"],
+          "enum": ["en", "rw", "fr", "sw"],
           "description": "Preferred UI and AI language",
           "maxLength": 5
         },
@@ -116,7 +116,7 @@
         },
         "language": {
           "type": "string",
-          "enum": ["en", "rw", "fr"],
+          "enum": ["en", "rw", "fr", "sw"],
           "description": "Plan language",
           "maxLength": 5
         },
@@ -238,7 +238,7 @@
         },
         "language": {
           "type": "string",
-          "enum": ["en", "rw", "fr"],
+          "enum": ["en", "rw", "fr", "sw"],
           "description": "Assessment language",
           "maxLength": 5
         },
@@ -321,7 +321,7 @@
         },
         "language": {
           "type": "string",
-          "enum": ["en", "rw", "fr"],
+          "enum": ["en", "rw", "fr", "sw"],
           "description": "Methodology language",
           "maxLength": 5
         },

@@ -38,6 +38,7 @@ import { AuthModal } from './components/AuthModal';
 import {
   AppBackup,
   ChatThread,
+  GraphicsQuality,
   Lang,
   LessonPlanData,
   SavedAssessment,
@@ -54,6 +55,7 @@ import {
   loadActiveChatId,
   loadAssessments,
   loadChats,
+  loadGraphicsQuality,
   loadLang,
   loadMethodologies,
   loadPlans,
@@ -62,6 +64,7 @@ import {
   saveActiveChatId,
   saveAssessments,
   saveChats,
+  saveGraphicsQuality,
   saveLang,
   saveMethodologies,
   savePlans,
@@ -69,6 +72,7 @@ import {
   saveTheme,
 } from './utils/storage';
 import { lessonPlanToWordHtml, printOrDownloadHtml } from './utils/export';
+import { GlobalScene3D } from './components/GlobalScene3D';
 import { LandingPage } from './components/LandingPage';
 import { LessonPlannerView } from './components/LessonPlannerView';
 import { AssistantView } from './components/AssistantView';
@@ -84,6 +88,9 @@ export default function App() {
 
   const [lang, setLangState] = useState<Lang>(() => loadLang());
   const [theme, setThemeState] = useState<ThemeMode>(() => loadTheme());
+  const [graphicsQuality, setGraphicsQualityState] = useState<GraphicsQuality>(() =>
+    loadGraphicsQuality()
+  );
   const [profile, setProfileState] = useState<TeacherProfile>(() => loadProfile());
 
   const [plans, setPlans] = useState<SavedPlan[]>(() => loadPlans());
@@ -129,6 +136,11 @@ export default function App() {
   useEffect(() => {
     document.documentElement.lang = lang;
   }, [lang]);
+
+  // Apply 3D graphics quality attribute to <html>
+  useEffect(() => {
+    document.documentElement.setAttribute('data-graphics', graphicsQuality);
+  }, [graphicsQuality]);
 
   const showToast = useCallback(
     (message: string, type: ToastItem['type'] = 'info') => {
@@ -270,9 +282,9 @@ export default function App() {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      showToast('Signed out.', 'info');
+      showToast(t('toast_signed_out'), 'info');
     } catch {
-      showToast('Could not sign out. Please try again.', 'error');
+      showToast(t('toast_signout_fail'), 'error');
     }
   };
 
@@ -280,9 +292,9 @@ export default function App() {
     if (!currentUser) return;
     try {
       await sendEmailVerification(currentUser);
-      showToast('Verification email sent. Check your inbox.', 'success');
+      showToast(t('toast_verify_sent'), 'success');
     } catch {
-      showToast('Could not send verification email right now.', 'error');
+      showToast(t('toast_verify_fail'), 'error');
     }
   };
 
@@ -293,12 +305,12 @@ export default function App() {
       await currentUser.getIdToken(true);
       if (auth.currentUser?.emailVerified) {
         setCurrentUser({ ...auth.currentUser } as User);
-        showToast('Email verified! Cloud sync enabled.', 'success');
+        showToast(t('toast_verified_ok'), 'success');
       } else {
-        showToast('Email not verified yet. Please click the link in your inbox.', 'warning');
+        showToast(t('toast_verify_pending'), 'warning');
       }
     } catch {
-      showToast('Could not refresh account status.', 'error');
+      showToast(t('toast_verify_refresh_fail'), 'error');
     }
   };
 
@@ -318,6 +330,12 @@ export default function App() {
     }
   };
 
+  const handleGraphicsQualityChange = (next: GraphicsQuality) => {
+    setGraphicsQualityState(next);
+    saveGraphicsQuality(next);
+    showToast(t('set_graphics_saved'), 'success');
+  };
+
   const handleProfileSave = (next: TeacherProfile) => {
     setProfileState(next);
     saveProfile(next);
@@ -334,6 +352,8 @@ export default function App() {
   };
 
   const handleQuickLaunchLesson = (prefill: { subject: string; classLevel: string }) => {
+    setActivePlan(null);
+    setEditingSavedId(null);
     setLessonPrefill({ ...prefill, nonce: Date.now() });
     launchWorkspace('lesson');
   };
@@ -401,7 +421,7 @@ export default function App() {
     if (currentUser?.emailVerified) {
       void savePlanToCloud(currentUser, copy).catch((e) => console.error(e));
     }
-    showToast('Lesson plan duplicated.', 'success');
+    showToast(t('toast_plan_duplicated'), 'success');
   };
 
   const handlePrintSavedPlan = (saved: SavedPlan) => {
@@ -429,7 +449,7 @@ export default function App() {
     if (currentUser?.emailVerified) {
       void deletePlanFromCloud(currentUser, id).catch((e) => console.error(e));
     }
-    showToast('Lesson plan deleted.', 'info');
+    showToast(t('toast_plan_deleted'), 'info');
   };
 
   const handleChatsUpdate = (nextThreads: ChatThread[], nextActiveId: string | null) => {
@@ -519,7 +539,7 @@ export default function App() {
     setActiveChatId(null);
     setAssessments([]);
     setMethodologies([]);
-    showToast('All saved history cleared.', 'info');
+    showToast(t('set_cleared_all'), 'info');
   };
 
   const navItems: Array<{ view: ViewName; key: string; icon: React.ComponentType<{ className?: string }> }> = [
@@ -535,9 +555,12 @@ export default function App() {
 
   return (
     <>
+      <GlobalScene3D graphicsQuality={graphicsQuality} />
+
       {!inWorkspace ? (
         <LandingPage
           lang={lang}
+          graphicsQuality={graphicsQuality}
           user={currentUser}
           onChangeLang={handleLangChange}
           onLaunch={launchWorkspace}
@@ -546,26 +569,26 @@ export default function App() {
           onSignOut={handleSignOut}
         />
       ) : (
-        <div id="workspaceApp" className="min-h-screen flex bg-[var(--bg)] text-[var(--text)]">
+        <div id="workspaceApp" className="relative z-10 min-h-screen flex bg-transparent text-[var(--text)]">
           {/* Mobile Backdrop */}
           {sidebarOpen && (
             <div
               onClick={() => setSidebarOpen(false)}
-              className="fixed inset-0 bg-black/40 z-40 lg:hidden no-print"
+              className="fixed inset-0 bg-black/55 z-40 lg:hidden no-print"
             />
           )}
 
           {/* Sidebar */}
           <aside
             id="sidebar"
-            className={`no-print fixed lg:sticky top-0 left-0 z-50 h-screen w-64 shrink-0 bg-[var(--surface)] border-r border-[var(--border)] flex flex-col justify-between p-4 transition-transform duration-200 lg:translate-x-0 ${
+            className={`no-print holo-glass fixed lg:sticky top-0 left-0 z-50 h-screen w-64 shrink-0 border-r border-[#38bdf8]/25 flex flex-col justify-between p-4 transition-transform duration-200 lg:translate-x-0 ${
               sidebarOpen ? 'translate-x-0' : '-translate-x-full'
             }`}
           >
             <div className="space-y-4 overflow-y-auto">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5 font-display font-bold text-base text-[var(--text)]">
-                  <span className="w-8 h-8 rounded-lg bg-[#15803D] text-white grid place-items-center font-bold shadow-xs">
+                  <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#10b981] to-[#0284c7] text-[#030712] grid place-items-center font-extrabold shadow-[0_0_16px_-4px_rgba(16,185,129,0.75)]">
                     G
                   </span>
                   <span>GHAD AI</span>
@@ -638,7 +661,7 @@ export default function App() {
                   {currentUser.emailVerified ? (
                     <div className="flex items-center gap-1 text-[11px] text-[#15803D] dark:text-[#4ade80]">
                       <CheckCircle2 className="w-3 h-3 shrink-0" />
-                      <span>Cloud Sync Active</span>
+                      <span>{t('cloud_sync_active')}</span>
                     </div>
                   ) : (
                     <div className="space-y-1.5 pt-1 border-t border-[var(--border)]">
@@ -687,6 +710,7 @@ export default function App() {
                   <option value="en">English</option>
                   <option value="rw">Ikinyarwanda</option>
                   <option value="fr">Français</option>
+                  <option value="sw">Kiswahili</option>
                 </select>
               </label>
 
@@ -712,7 +736,7 @@ export default function App() {
             type="button"
             onClick={() => setSidebarOpen((s) => !s)}
             aria-label="Toggle menu"
-            className="no-print lg:hidden fixed top-3 left-3 z-30 p-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] cursor-pointer"
+            className="no-print holo-glass lg:hidden fixed top-3 left-3 z-30 p-2.5 rounded-lg border border-[#38bdf8]/35 text-[var(--text)] cursor-pointer"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -722,8 +746,8 @@ export default function App() {
             {activeView === 'dashboard' && (
               <section id="view-dashboard" className="view-animate space-y-6">
                 <div>
-                  <span className="text-xs font-semibold text-[#0284C7] dark:text-[#38BDF8]">
-                    🇷🇼 Rwanda Competence-Based Workspace
+                  <span className="text-xs font-semibold text-[#38bdf8]">
+                    🇷🇼 {t('dash_workspace_badge')}
                   </span>
                   <h1 data-i18n="dash_title" className="font-display text-2xl sm:text-3xl font-bold text-[var(--text)] mt-1">
                     {t('dash_title')}
@@ -734,79 +758,79 @@ export default function App() {
                 </div>
 
                 {/* Tabular workspace summary */}
-                <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs flex flex-wrap items-center gap-6 text-sm">
+                <div className="holo-glass holo-reticle p-4 sm:p-5 rounded-2xl border border-[#38bdf8]/30 flex flex-wrap items-center gap-6 text-sm">
                   <div>
-                    <span className="text-xs text-[var(--muted)] block">Saved Lesson Plans</span>
-                    <strong className="font-display text-2xl font-bold font-mono-tabular text-[#15803D] dark:text-[#4ade80]">
+                    <span className="text-xs text-[var(--muted)] block">{t('stat_saved_plans')}</span>
+                    <strong className="font-display text-2xl font-bold font-mono-tabular text-[#10b981]">
                       {plans.length}
                     </strong>
                   </div>
                   <div className="h-9 w-px bg-[var(--border)] hidden sm:block" />
                   <div>
-                    <span className="text-xs text-[var(--muted)] block">Assistant Threads</span>
-                    <strong className="font-display text-2xl font-bold font-mono-tabular text-[#0284C7] dark:text-[#38BDF8]">
+                    <span className="text-xs text-[var(--muted)] block">{t('stat_assistant_threads')}</span>
+                    <strong className="font-display text-2xl font-bold font-mono-tabular text-[#38bdf8]">
                       {chats.length}
                     </strong>
                   </div>
                   <div className="h-9 w-px bg-[var(--border)] hidden sm:block" />
                   <div>
-                    <span className="text-xs text-[var(--muted)] block">Saved Assessments</span>
-                    <strong className="font-display text-2xl font-bold font-mono-tabular text-[#F59E0B]">
+                    <span className="text-xs text-[var(--muted)] block">{t('stat_saved_assessments')}</span>
+                    <strong className="font-display text-2xl font-bold font-mono-tabular text-[#f59e0b]">
                       {assessments.length}
                     </strong>
                   </div>
                   <div className="h-9 w-px bg-[var(--border)] hidden sm:block" />
                   <div>
-                    <span className="text-xs text-[var(--muted)] block">Methodology Guides</span>
+                    <span className="text-xs text-[var(--muted)] block">{t('stat_methodology_guides')}</span>
                     <strong className="font-display text-2xl font-bold font-mono-tabular text-[var(--text)]">
                       {methodologies.length}
                     </strong>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="perspective-stage grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[
                     {
                       view: 'lesson' as ViewName,
                       icon: BookOpen,
                       tk: 'nav_lesson',
                       dk: 'dash_lesson_d',
-                      iconStyle: 'bg-[#15803D]/12 text-[#15803D] dark:text-[#4ade80]',
+                      iconStyle: 'bg-[#10b981]/15 text-[#10b981]',
                     },
                     {
                       view: 'assistant' as ViewName,
                       icon: MessageSquare,
                       tk: 'nav_assistant',
                       dk: 'dash_ai_d',
-                      iconStyle: 'bg-[#0284C7]/12 text-[#0284C7] dark:text-[#38BDF8]',
+                      iconStyle: 'bg-[#38bdf8]/15 text-[#38bdf8]',
                     },
                     {
                       view: 'assessment' as ViewName,
                       icon: ClipboardCheck,
                       tk: 'nav_assessment',
                       dk: 'dash_assess_d',
-                      iconStyle: 'bg-[#F59E0B]/15 text-[#D97706] dark:text-[#FBBF24]',
+                      iconStyle: 'bg-[#f59e0b]/15 text-[#fbbf24]',
                     },
                     {
                       view: 'methodology' as ViewName,
                       icon: Compass,
                       tk: 'nav_methodology',
                       dk: 'dash_method_d',
-                      iconStyle: 'bg-[#15803D]/12 text-[#15803D] dark:text-[#4ade80]',
+                      iconStyle: 'bg-[#10b981]/15 text-[#10b981]',
                     },
                     {
                       view: 'library' as ViewName,
                       icon: FolderOpen,
                       tk: 'nav_library',
                       dk: 'dash_library_d',
-                      iconStyle: 'bg-[#0284C7]/12 text-[#0284C7] dark:text-[#38BDF8]',
+                      iconStyle: 'bg-[#38bdf8]/15 text-[#38bdf8]',
                     },
                     {
                       view: 'resources' as ViewName,
                       icon: Link2,
                       tk: 'nav_resources',
                       dk: 'dash_res_d',
-                      iconStyle: 'bg-[#F59E0B]/15 text-[#D97706] dark:text-[#FBBF24]',
+                      iconStyle: 'bg-[#f59e0b]/15 text-[#fbbf24]',
                     },
                     {
                       view: 'settings' as ViewName,
@@ -822,7 +846,7 @@ export default function App() {
                         key={card.view}
                         type="button"
                         onClick={() => switchView(card.view)}
-                        className="text-left p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] hover:border-[#15803D] hover:shadow-sm transition-all flex flex-col gap-3 cursor-pointer"
+                        className="holo-glass holo-reticle card-3d-tilt text-left p-5 rounded-2xl border border-[#38bdf8]/25 hover:border-[#10b981] flex flex-col gap-3 cursor-pointer"
                       >
                         <div className={`w-10 h-10 rounded-xl grid place-items-center ${card.iconStyle}`}>
                           <Icon className="w-5 h-5" />
@@ -858,6 +882,7 @@ export default function App() {
             {activeView === 'assistant' && (
               <AssistantView
                 lang={lang}
+                graphicsQuality={graphicsQuality}
                 threads={chats}
                 activeThreadId={activeChatId}
                 onUpdateThreads={handleChatsUpdate}
@@ -904,9 +929,11 @@ export default function App() {
               <SettingsView
                 lang={lang}
                 theme={theme}
+                graphicsQuality={graphicsQuality}
                 profile={profile}
                 onChangeLang={handleLangChange}
                 onChangeTheme={handleThemeChange}
+                onChangeGraphicsQuality={handleGraphicsQualityChange}
                 onSaveProfile={handleProfileSave}
                 onImportBackup={handleImportBackup}
                 onClearAll={handleClearAll}
@@ -935,14 +962,14 @@ export default function App() {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`px-4 py-3 rounded-xl border text-sm font-medium shadow-lg bg-[var(--surface)] text-[var(--text)] ${
+            className={`holo-glass px-4 py-3 rounded-xl border text-sm font-medium shadow-lg text-[var(--text)] ${
               toast.type === 'error'
                 ? 'border-red-400 text-red-700 dark:text-red-300'
                 : toast.type === 'success'
-                ? 'border-[#15803D] text-[#15803D] dark:text-[#4ade80]'
+                ? 'border-[#10b981] text-[#059669] dark:text-[#34d399]'
                 : toast.type === 'warning'
-                ? 'border-[#F59E0B] text-amber-700 dark:text-amber-300'
-                : 'border-[var(--border)]'
+                ? 'border-[#f59e0b] text-amber-700 dark:text-amber-300'
+                : 'border-[#38bdf8]/40'
             }`}
           >
             {toast.message}
