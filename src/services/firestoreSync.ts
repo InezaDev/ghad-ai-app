@@ -80,7 +80,16 @@ function sanitizePlanContent(plan: LessonPlanData): LessonPlanData {
       teacherActivities: clampStr(st?.teacherActivities, 3000),
       learnerActivities: clampStr(st?.learnerActivities, 3000),
       competencesAndIssues: clampStr(st?.competencesAndIssues, 2000),
+      ...(typeof st?.observations === 'string' && st.observations.trim()
+        ? { observations: clampStr(st.observations, 1500) }
+        : {}),
     })),
+    ...(typeof plan.assessmentCriteria === 'string' && plan.assessmentCriteria.trim()
+      ? { assessmentCriteria: clampStr(plan.assessmentCriteria, 2000) }
+      : {}),
+    ...(typeof plan.homework === 'string' && plan.homework.trim()
+      ? { homework: clampStr(plan.homework, 2000) }
+      : {}),
     teacherSelfEvaluation: clampStr(plan.teacherSelfEvaluation, 2000),
   };
 }
@@ -322,6 +331,20 @@ export async function saveAssessmentToCloud(user: User, item: SavedAssessment): 
   }
 }
 
+export async function deleteAssessmentFromCloud(
+  user: User,
+  assessmentId: string
+): Promise<void> {
+  if (!user.emailVerified) return;
+  const safeId = sanitizeId(assessmentId, 'assess');
+  const path = `users/${user.uid}/assessments/${safeId}`;
+  try {
+    await deleteDoc(doc(db, 'users', user.uid, 'assessments', safeId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
 export async function saveMethodologyToCloud(user: User, item: SavedMethodology): Promise<void> {
   if (!user.emailVerified) return;
   await ensureUserAccountDoc(user);
@@ -376,6 +399,20 @@ export async function saveMethodologyToCloud(user: User, item: SavedMethodology)
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteMethodologyFromCloud(
+  user: User,
+  methodologyId: string
+): Promise<void> {
+  if (!user.emailVerified) return;
+  const safeId = sanitizeId(methodologyId, 'method');
+  const path = `users/${user.uid}/methodologies/${safeId}`;
+  try {
+    await deleteDoc(doc(db, 'users', user.uid, 'methodologies', safeId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
 

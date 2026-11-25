@@ -25,7 +25,9 @@ import {
 } from 'lucide-react';
 import { auth } from './firebase';
 import {
+  deleteAssessmentFromCloud,
   deleteChatFromCloud,
+  deleteMethodologyFromCloud,
   deletePlanFromCloud,
   saveAssessmentToCloud,
   saveChatToCloud,
@@ -53,6 +55,7 @@ import { translate } from './i18n/translations';
 import {
   clearAllStoredHistory,
   loadActiveChatId,
+  loadActivePlanDraft,
   loadAssessments,
   loadChats,
   loadGraphicsQuality,
@@ -62,6 +65,7 @@ import {
   loadProfile,
   loadTheme,
   saveActiveChatId,
+  saveActivePlanDraft,
   saveAssessments,
   saveChats,
   saveGraphicsQuality,
@@ -76,8 +80,8 @@ import { GlobalScene3D } from './components/GlobalScene3D';
 import { LandingPage } from './components/LandingPage';
 import { LessonPlannerView } from './components/LessonPlannerView';
 import { AssistantView } from './components/AssistantView';
-import { AssessmentView } from './components/AssessmentView';
-import { MethodologyView } from './components/MethodologyView';
+import { AssessmentPrefill, AssessmentView } from './components/AssessmentView';
+import { MethodologyPrefill, MethodologyView } from './components/MethodologyView';
 import { LibraryView } from './components/LibraryView';
 import { ResourcesView, SettingsView } from './components/ResourcesAndSettingsViews';
 
@@ -94,19 +98,30 @@ export default function App() {
   const [profile, setProfileState] = useState<TeacherProfile>(() => loadProfile());
 
   const [plans, setPlans] = useState<SavedPlan[]>(() => loadPlans());
-  const [activePlan, setActivePlan] = useState<LessonPlanData | null>(null);
+  const [activePlan, setActivePlan] = useState<LessonPlanData | null>(() => loadActivePlanDraft());
   const [editingSavedId, setEditingSavedId] = useState<string | null>(null);
+  const [lastSavedPlanJson, setLastSavedPlanJson] = useState<string | null>(null);
   const [lessonPrefill, setLessonPrefill] = useState<{
     subject: string;
     classLevel: string;
     nonce: number;
   } | null>(null);
+  const [assessmentPrefill, setAssessmentPrefill] = useState<AssessmentPrefill | null>(null);
+  const [methodologyPrefill, setMethodologyPrefill] = useState<MethodologyPrefill | null>(null);
 
   const [chats, setChats] = useState<ChatThread[]>(() => loadChats());
   const [activeChatId, setActiveChatId] = useState<string | null>(() => loadActiveChatId());
 
   const [assessments, setAssessments] = useState<SavedAssessment[]>(() => loadAssessments());
   const [methodologies, setMethodologies] = useState<SavedMethodology[]>(() => loadMethodologies());
+
+  useEffect(() => {
+    saveActivePlanDraft(activePlan);
+  }, [activePlan]);
+
+  const hasUnsavedPlanChanges = Boolean(
+    activePlan && (!editingSavedId || JSON.stringify(activePlan) !== lastSavedPlanJson)
+  );
 
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [authReady, setAuthReady] = useState(false);
@@ -198,6 +213,8 @@ export default function App() {
     const uid = currentUser.uid;
     let firstPlansSnap = true;
     let firstChatsSnap = true;
+    let firstAssessSnap = true;
+    let firstMethodSnap = true;
 
     const unsub = subscribeUserCloudData(currentUser, {
       onProfile: (cloudProfile, cloudLang, cloudTheme) => {
@@ -249,10 +266,42 @@ export default function App() {
         saveChats(cloudChats);
       },
       onAssessments: (cloudAssessments) => {
+        if (firstAssessSnap) {
+          firstAssessSnap = false;
+          const cloudIds = new Set(cloudAssessments.map((a) => a.id));
+          const localOnly = loadAssessments().filter((a) => !cloudIds.has(a.id));
+          localOnly.forEach((a) => {
+            void saveAssessmentToCloud(currentUser, a).catch((e) => console.error(e));
+          });
+          if (localOnly.length > 0) {
+            const merged = [...localOnly, ...cloudAssessments].sort((a, b) =>
+              b.createdAt.localeCompare(a.createdAt)
+            );
+            setAssessments(merged);
+            saveAssessments(merged);
+            return;
+          }
+        }
         setAssessments(cloudAssessments);
         saveAssessments(cloudAssessments);
       },
       onMethodologies: (cloudMethodologies) => {
+        if (firstMethodSnap) {
+          firstMethodSnap = false;
+          const cloudIds = new Set(cloudMethodologies.map((m) => m.id));
+          const localOnly = loadMethodologies().filter((m) => !cloudIds.has(m.id));
+          localOnly.forEach((m) => {
+            void saveMethodologyToCloud(currentUser, m).catch((e) => console.error(e));
+          });
+          if (localOnly.length > 0) {
+            const merged = [...localOnly, ...cloudMethodologies].sort((a, b) =>
+              b.createdAt.localeCompare(a.createdAt)
+            );
+            setMethodologies(merged);
+            saveMethodologies(merged);
+            return;
+          }
+        }
         setMethodologies(cloudMethodologies);
         saveMethodologies(cloudMethodologies);
       },
@@ -354,6 +403,7 @@ export default function App() {
   const handleQuickLaunchLesson = (prefill: { subject: string; classLevel: string }) => {
     setActivePlan(null);
     setEditingSavedId(null);
+    setLastSavedPlanJson(null);
     setLessonPrefill({ ...prefill, nonce: Date.now() });
     launchWorkspace('lesson');
   };
@@ -362,6 +412,26 @@ export default function App() {
     setActiveView(view);
     setSidebarOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCreateAssessmentFromPlan = (planData: LessonPlanData) => {
+    setAssessmentPrefill({
+      subject: planData.subject || '',
+      classLevel: planData.classLevel || '',
+      topic: planData.lessonTitle || planData.unitTitle || planData.subject || '',
+      nonce: Date.now(),
+    });
+    switchView('assessment');
+  };
+
+  const handleCreateMethodologyFromPlan = (planData: LessonPlanData) => {
+    setMethodologyPrefill({
+      subject: planData.subject || '',
+      classLevel: planData.classLevel || '',
+      topic: planData.lessonTitle || planData.unitTitle || planData.subject || '',
+      nonce: Date.now(),
+    });
+    switchView('methodology');
   };
 
   // Lesson Plan Persistence Handlers
@@ -391,6 +461,7 @@ export default function App() {
       savePlans(next);
       setEditingSavedId(savedToSync.id);
     }
+    setLastSavedPlanJson(JSON.stringify(planData));
     if (currentUser?.emailVerified) {
       void savePlanToCloud(currentUser, savedToSync).catch((e) => console.error(e));
     }
@@ -400,6 +471,7 @@ export default function App() {
   const handleOpenSavedPlan = (saved: SavedPlan) => {
     setActivePlan(saved.plan);
     setEditingSavedId(saved.id);
+    setLastSavedPlanJson(JSON.stringify(saved.plan));
     switchView('lesson');
   };
 
@@ -427,6 +499,7 @@ export default function App() {
   const handlePrintSavedPlan = (saved: SavedPlan) => {
     setActivePlan(saved.plan);
     setEditingSavedId(saved.id);
+    setLastSavedPlanJson(JSON.stringify(saved.plan));
     switchView('lesson');
     setTimeout(() => {
       printOrDownloadHtml({
@@ -445,7 +518,10 @@ export default function App() {
     const next = plans.filter((p) => p.id !== id);
     setPlans(next);
     savePlans(next);
-    if (editingSavedId === id) setEditingSavedId(null);
+    if (editingSavedId === id) {
+      setEditingSavedId(null);
+      setLastSavedPlanJson(null);
+    }
     if (currentUser?.emailVerified) {
       void deletePlanFromCloud(currentUser, id).catch((e) => console.error(e));
     }
@@ -477,18 +553,44 @@ export default function App() {
   };
 
   const handleAssessmentsUpdate = (next: SavedAssessment[]) => {
+    const prevIds = new Set(assessments.map((a) => a.id));
+    const nextIds = new Set(next.map((a) => a.id));
+
     setAssessments(next);
     saveAssessments(next);
-    if (currentUser?.emailVerified && next[0]) {
-      void saveAssessmentToCloud(currentUser, next[0]).catch((e) => console.error(e));
+
+    if (currentUser?.emailVerified) {
+      for (const id of prevIds) {
+        if (!nextIds.has(id)) {
+          void deleteAssessmentFromCloud(currentUser, id).catch((e) => console.error(e));
+        }
+      }
+      for (const item of next) {
+        if (!prevIds.has(item.id)) {
+          void saveAssessmentToCloud(currentUser, item).catch((e) => console.error(e));
+        }
+      }
     }
   };
 
   const handleMethodologiesUpdate = (next: SavedMethodology[]) => {
+    const prevIds = new Set(methodologies.map((m) => m.id));
+    const nextIds = new Set(next.map((m) => m.id));
+
     setMethodologies(next);
     saveMethodologies(next);
-    if (currentUser?.emailVerified && next[0]) {
-      void saveMethodologyToCloud(currentUser, next[0]).catch((e) => console.error(e));
+
+    if (currentUser?.emailVerified) {
+      for (const id of prevIds) {
+        if (!nextIds.has(id)) {
+          void deleteMethodologyFromCloud(currentUser, id).catch((e) => console.error(e));
+        }
+      }
+      for (const item of next) {
+        if (!prevIds.has(item.id)) {
+          void saveMethodologyToCloud(currentUser, item).catch((e) => console.error(e));
+        }
+      }
     }
   };
 
@@ -535,6 +637,7 @@ export default function App() {
     setPlans([]);
     setActivePlan(null);
     setEditingSavedId(null);
+    setLastSavedPlanJson(null);
     setChats([]);
     setActiveChatId(null);
     setAssessments([]);
@@ -872,8 +975,11 @@ export default function App() {
                 profile={profile}
                 activePlan={activePlan}
                 prefill={lessonPrefill}
+                hasUnsavedChanges={hasUnsavedPlanChanges}
                 onSetActivePlan={(p) => setActivePlan(p)}
                 onSavePlan={handleSavePlan}
+                onCreateAssessmentFromPlan={handleCreateAssessmentFromPlan}
+                onCreateMethodologyFromPlan={handleCreateMethodologyFromPlan}
                 onToast={showToast}
                 onCopy={copyText}
               />
@@ -895,6 +1001,7 @@ export default function App() {
               <AssessmentView
                 lang={lang}
                 history={assessments}
+                prefill={assessmentPrefill}
                 onSaveHistory={handleAssessmentsUpdate}
                 onToast={showToast}
                 onCopy={copyText}
@@ -905,6 +1012,7 @@ export default function App() {
               <MethodologyView
                 lang={lang}
                 history={methodologies}
+                prefill={methodologyPrefill}
                 onSaveHistory={handleMethodologiesUpdate}
                 onToast={showToast}
                 onCopy={copyText}

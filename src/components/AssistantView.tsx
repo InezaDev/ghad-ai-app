@@ -150,6 +150,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
 }) => {
   const t = (k: string) => translate(lang, k);
   const [input, setInput] = useState('');
+  const [useWebSearch, setUseWebSearch] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
   );
@@ -245,7 +246,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
   const handleSubmit = (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
     if (!text) return;
-    enqueueMessage(text, { targetThreadId: activeThread?.id ?? null });
+    enqueueMessage(text, { targetThreadId: activeThread?.id ?? null, useWebSearch });
     if (!overrideText) setInput('');
   };
 
@@ -776,12 +777,28 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
           )}
 
           <form
-            className="p-3 sm:p-4 border-t border-[var(--border)] bg-[var(--surface-subtle)] flex items-center gap-2.5"
+            className="p-3 sm:p-4 border-t border-[var(--border)] bg-[var(--surface-subtle)] flex flex-wrap sm:flex-nowrap items-center gap-2"
             onSubmit={(e) => {
               e.preventDefault();
               handleSubmit();
             }}
           >
+            <button
+              type="button"
+              aria-pressed={useWebSearch}
+              onClick={() => setUseWebSearch((v) => !v)}
+              title={useWebSearch ? t('assistant_web_search_on') : t('assistant_web_search_off')}
+              className={`inline-flex items-center gap-1.5 px-3 min-h-[44px] text-xs font-semibold rounded-xl border transition-colors cursor-pointer whitespace-nowrap ${
+                useWebSearch
+                  ? 'border-[#0284C7]/50 bg-[#0284C7]/12 text-[#0284C7] dark:text-[#38BDF8]'
+                  : 'border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--text)]'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden md:inline">
+                {useWebSearch ? t('assistant_web_search_on') : t('assistant_web_search_off')}
+              </span>
+            </button>
             <input
               id="chatInput"
               type="text"
@@ -789,7 +806,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
               onChange={(e) => setInput(e.target.value)}
               data-i18n-ph="chat_ph"
               placeholder={t('chat_ph')}
-              className="flex-1 px-4 min-h-[44px] text-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
+              className="flex-1 min-w-[180px] px-4 min-h-[44px] text-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
             />
             <button
               id="sendChat"

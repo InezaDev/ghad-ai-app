@@ -22,9 +22,19 @@ import {
 } from '../utils/export';
 import { AiClientError, requestMethodology } from '../services/aiClient';
 
+const RWANDA_CLASSES = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6'];
+
+export interface MethodologyPrefill {
+  subject: string;
+  classLevel: string;
+  topic: string;
+  nonce: number;
+}
+
 interface MethodologyViewProps {
   lang: Lang;
   history: SavedMethodology[];
+  prefill?: MethodologyPrefill | null;
   onSaveHistory: (next: SavedMethodology[]) => void;
   onToast: (msg: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
   onCopy: (text: string) => void;
@@ -33,6 +43,7 @@ interface MethodologyViewProps {
 export const MethodologyView: React.FC<MethodologyViewProps> = ({
   lang,
   history,
+  prefill,
   onSaveHistory,
   onToast,
   onCopy,
@@ -41,6 +52,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
 
   const [subject, setSubject] = useState('');
   const [classLevel, setClassLevel] = useState('');
+  const [customClassSelected, setCustomClassSelected] = useState(false);
   const [topic, setTopic] = useState('');
   const [loading, setLoading] = useState(false);
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
@@ -49,6 +61,17 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
   const abortRef = useRef<AbortController | null>(null);
   const safeHistory = history.filter((item) => item && item.data);
   const [active, setActive] = useState<SavedMethodology | null>(safeHistory[0] ?? null);
+
+  useEffect(() => {
+    if (!prefill) return;
+    setSubject(prefill.subject);
+    setClassLevel(prefill.classLevel);
+    setCustomClassSelected(
+      Boolean(prefill.classLevel && !RWANDA_CLASSES.includes(prefill.classLevel))
+    );
+    setTopic(prefill.topic);
+    setErrorMsg(null);
+  }, [prefill]);
 
   useEffect(() => {
     return () => {
@@ -94,7 +117,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
       } catch (firstErr) {
         if (firstErr instanceof AiClientError && firstErr.isAborted) return;
         if (firstErr instanceof AiClientError && firstErr.isHighDemand) {
-          for (let sec = 4; sec >= 1; sec--) {
+          for (let sec = 3; sec >= 1; sec--) {
             if (controller.signal.aborted) return;
             setRetryCountdown(sec);
             await new Promise((r) => setTimeout(r, 1000));
@@ -144,6 +167,14 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
     onToast(t('method_deleted'), 'info');
   };
 
+  const classSelectValue = customClassSelected
+    ? '__OTHER__'
+    : RWANDA_CLASSES.includes(classLevel)
+    ? classLevel
+    : classLevel
+    ? '__OTHER__'
+    : '';
+
   return (
     <section id="view-methodology" className="view-animate space-y-6">
       <div className="no-print">
@@ -176,18 +207,49 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
               className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
             />
           </label>
-          <label className="flex flex-col gap-1.5 text-xs font-semibold text-[var(--muted)]">
-            <span data-i18n="f_class">{t('f_class')} *</span>
-            <input
+          <div className="flex flex-col gap-1.5 text-xs font-semibold text-[var(--muted)]">
+            <label htmlFor="methodClass" data-i18n="f_class">
+              {t('f_class')} *
+            </label>
+            <select
               id="methodClass"
-              type="text"
-              value={classLevel}
-              onChange={(e) => setClassLevel(e.target.value)}
+              value={classSelectValue}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === '__OTHER__') {
+                  setCustomClassSelected(true);
+                  if (RWANDA_CLASSES.includes(classLevel)) {
+                    setClassLevel('');
+                  }
+                } else {
+                  setCustomClassSelected(false);
+                  setClassLevel(v);
+                }
+              }}
               disabled={loading}
-              placeholder={t('method_ph_class')}
               className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
-            />
-          </label>
+            >
+              <option value="">{t('select_class')}</option>
+              {RWANDA_CLASSES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              <option value="__OTHER__">{t('class_other')}</option>
+            </select>
+            {classSelectValue === '__OTHER__' && (
+              <input
+                id="methodClassCustom"
+                type="text"
+                value={classLevel}
+                onChange={(e) => setClassLevel(e.target.value)}
+                disabled={loading}
+                aria-label={t('f_class_other')}
+                placeholder={t('method_ph_class')}
+                className="mt-1 px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
+              />
+            )}
+          </div>
           <label className="flex flex-col gap-1.5 text-xs font-semibold text-[var(--muted)]">
             <span data-i18n="f_topic">{t('f_topic')} *</span>
             <input

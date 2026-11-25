@@ -12,6 +12,7 @@ export interface QueuedAssistantJob {
   userMessageId?: string;
   text: string;
   skipAppendUser?: boolean;
+  useWebSearch?: boolean;
   enqueuedAt: number;
 }
 
@@ -27,6 +28,7 @@ export interface FailedAssistantJob {
   threadId: string;
   userMessageId?: string;
   text: string;
+  useWebSearch?: boolean;
   error: string;
 }
 
@@ -39,7 +41,7 @@ interface UseAssistantQueueParams {
 }
 
 const MAX_AUTO_ATTEMPTS = 2;
-const HIGH_DEMAND_COOLDOWN_SEC = 4;
+const HIGH_DEMAND_COOLDOWN_SEC = 3;
 
 export function useAssistantQueue({
   lang,
@@ -255,6 +257,7 @@ export function useAssistantQueue({
           lang: langRef.current,
           message: nextJob.text,
           history: historyWithoutCurrent,
+          useWebSearch: nextJob.useWebSearch,
           signal: controller.signal,
         });
 
@@ -304,6 +307,7 @@ export function useAssistantQueue({
             threadId: targetThreadId,
             userMessageId: activeUserMsgId,
             text: nextJob.text,
+            useWebSearch: nextJob.useWebSearch,
             error: msg,
           });
           onToastRef.current(`${translate(langRef.current, 'toast_net')}: ${msg}`, 'error');
@@ -326,7 +330,12 @@ export function useAssistantQueue({
   const enqueueMessage = useCallback(
     (
       rawText: string,
-      opts?: { targetThreadId?: string | null; skipAppendUser?: boolean; userMessageId?: string }
+      opts?: {
+        targetThreadId?: string | null;
+        skipAppendUser?: boolean;
+        userMessageId?: string;
+        useWebSearch?: boolean;
+      }
     ) => {
       const text = rawText.trim();
       if (!text) return;
@@ -363,6 +372,7 @@ export function useAssistantQueue({
         userMessageId: resolvedUserMessageId,
         text,
         skipAppendUser: !processingRef.current || Boolean(opts?.skipAppendUser),
+        useWebSearch: opts?.useWebSearch ?? true,
         enqueuedAt: Date.now(),
       };
 
@@ -376,9 +386,14 @@ export function useAssistantQueue({
 
   const retryFailed = useCallback(() => {
     if (!failedJob) return;
-    const { threadId, userMessageId, text } = failedJob;
+    const { threadId, userMessageId, text, useWebSearch } = failedJob;
     setFailedJob(null);
-    enqueueMessage(text, { targetThreadId: threadId, skipAppendUser: true, userMessageId });
+    enqueueMessage(text, {
+      targetThreadId: threadId,
+      skipAppendUser: true,
+      userMessageId,
+      useWebSearch,
+    });
   }, [failedJob, enqueueMessage]);
 
   const retryNow = useCallback(() => {

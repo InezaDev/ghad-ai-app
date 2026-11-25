@@ -13,6 +13,8 @@ export type ViewName =
 
 export type StageType = 'intro' | 'development' | 'conclusion';
 
+export type PrintOrientation = 'portrait' | 'landscape';
+
 export interface LessonStageRow {
   id: string;
   stageType: StageType;
@@ -21,6 +23,7 @@ export interface LessonStageRow {
   teacherActivities: string;
   learnerActivities: string;
   competencesAndIssues: string;
+  observations?: string;
 }
 
 export interface LessonPlanData {
@@ -44,6 +47,8 @@ export interface LessonPlanData {
   references: string;
   activityOverview: string;
   stages: LessonStageRow[];
+  assessmentCriteria?: string;
+  homework?: string;
   teacherSelfEvaluation: string;
 }
 

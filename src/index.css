@@ -2,8 +2,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
-  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
@@ -21,8 +21,8 @@
   --gold: #f59e0b;
   --gold-soft: rgba(245, 158, 11, 0.14);
   --border: rgba(16, 185, 129, 0.34);
-  --font-display: "Space Grotesk", system-ui, sans-serif;
-  --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
@@ -375,6 +375,10 @@ html[data-graphics="low"] .card-3d-tilt:hover {
   }
 
   .print-hide-row-controls {
+    display: none !important;
+  }
+
+  #assessmentOutput[data-print-answers="false"] .assessment-answer-key {
     display: none !important;
   }
 }

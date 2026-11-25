@@ -49,6 +49,7 @@ export default withApiErrorHandler<ApiRequest, ApiResponse>(
       history: Array.isArray(body.history)
         ? (body.history as Array<{ role: string; text: string }>)
         : undefined,
+      useWebSearch: body.useWebSearch !== false,
     });
 
     res.status(200).json({ reply: result.reply, sources: result.sources });

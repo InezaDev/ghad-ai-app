@@ -40,6 +40,7 @@ export const RebLessonPlanTable: React.FC<RebLessonPlanTableProps> = ({ plan, la
       teacherActivities: '',
       learnerActivities: '',
       competencesAndIssues: '',
+      observations: '',
     };
 
     const conclusionIndex = plan.stages.findIndex((s) => s.stageType === 'conclusion');
@@ -360,20 +361,23 @@ export const RebLessonPlanTable: React.FC<RebLessonPlanTableProps> = ({ plan, la
               <tr>
                 <th
                   rowSpan={2}
-                  style={{ width: '15%', verticalAlign: 'middle', textAlign: 'center' }}
+                  style={{ width: '12%', verticalAlign: 'middle', textAlign: 'center' }}
                 >
                   {t('cbc_stages')}
                 </th>
-                <th colSpan={2} style={{ width: '57%', textAlign: 'center' }}>
+                <th colSpan={2} style={{ width: '50%', textAlign: 'center' }}>
                   {t('cbc_desc')}
                 </th>
-                <th rowSpan={2} style={{ width: '28%', verticalAlign: 'middle' }}>
+                <th rowSpan={2} style={{ width: '23%', verticalAlign: 'middle' }}>
                   {t('cbc_generic')}
+                </th>
+                <th rowSpan={2} style={{ width: '15%', verticalAlign: 'middle' }}>
+                  {t('cbc_observations')}
                 </th>
               </tr>
               <tr>
-                <th style={{ width: '28.5%' }}>{t('cbc_teacher_act')}</th>
-                <th style={{ width: '28.5%' }}>{t('cbc_learner_act')}</th>
+                <th style={{ width: '25%' }}>{t('cbc_teacher_act')}</th>
+                <th style={{ width: '25%' }}>{t('cbc_learner_act')}</th>
               </tr>
             </thead>
 
@@ -389,6 +393,7 @@ export const RebLessonPlanTable: React.FC<RebLessonPlanTableProps> = ({ plan, la
                 >
                   {plan.activityOverview}
                 </td>
+                <td className="bg-[#f8faf9]" />
                 <td className="bg-[#f8faf9]" />
               </tr>
               {plan.stages.map((stage) => (
@@ -472,14 +477,61 @@ export const RebLessonPlanTable: React.FC<RebLessonPlanTableProps> = ({ plan, la
                   >
                     {stage.competencesAndIssues}
                   </td>
+
+                  <td
+                    className="whitespace-pre-wrap text-xs"
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={(e) =>
+                      updateStage(
+                        stage.id,
+                        'observations',
+                        e.currentTarget.textContent || ''
+                      )
+                    }
+                  >
+                    {stage.observations || ''}
+                  </td>
                 </tr>
               ))}
+
+              {/* Assessment Criteria & Homework rows */}
+              <tr>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                  {t('cbc_assess_criteria')}
+                </th>
+                <td
+                  colSpan={4}
+                  className="whitespace-pre-wrap"
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={(e) =>
+                    updateField('assessmentCriteria', e.currentTarget.textContent || '')
+                  }
+                >
+                  {plan.assessmentCriteria || ''}
+                </td>
+              </tr>
+              <tr>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                  {t('cbc_homework')}
+                </th>
+                <td
+                  colSpan={4}
+                  className="whitespace-pre-wrap"
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={(e) => updateField('homework', e.currentTarget.textContent || '')}
+                >
+                  {plan.homework || ''}
+                </td>
+              </tr>
 
               {/* Self-evaluation row matching bottom of uploaded REB template */}
               <tr>
                 <th style={{ textAlign: 'center', verticalAlign: 'middle' }}>{t('cbc_eval')}</th>
                 <td
-                  colSpan={3}
+                  colSpan={4}
                   className="whitespace-pre-wrap"
                   contentEditable
                   suppressContentEditableWarning

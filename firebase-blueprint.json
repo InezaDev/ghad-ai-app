@@ -132,7 +132,7 @@
         },
         "plan": {
           "type": "object",
-          "description": "Structured REB LessonPlanData map including metadata and bounded stages array"
+          "description": "Structured REB LessonPlanData map including metadata, optional assessmentCriteria/homework, and bounded stages array (with optional stage observations)"
         },
         "createdAt": {
           "type": "string",

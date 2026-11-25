@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import {
   AlertCircle,
   Copy,
@@ -6,6 +7,7 @@ import {
   EyeOff,
   FileDown,
   History,
+  KeyRound,
   Loader2,
   Printer,
   RefreshCw,
@@ -20,13 +22,24 @@ import {
   assessmentToPlainText,
   assessmentToWordHtml,
   downloadWordDoc,
+  isEmbeddedSandbox,
   printOrDownloadHtml,
 } from '../utils/export';
 import { AiClientError, requestAssessment } from '../services/aiClient';
 
+const RWANDA_CLASSES = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6'];
+
+export interface AssessmentPrefill {
+  subject: string;
+  classLevel: string;
+  topic: string;
+  nonce: number;
+}
+
 interface AssessmentViewProps {
   lang: Lang;
   history: SavedAssessment[];
+  prefill?: AssessmentPrefill | null;
   onSaveHistory: (next: SavedAssessment[]) => void;
   onToast: (msg: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
   onCopy: (text: string) => void;
@@ -35,6 +48,7 @@ interface AssessmentViewProps {
 export const AssessmentView: React.FC<AssessmentViewProps> = ({
   lang,
   history,
+  prefill,
   onSaveHistory,
   onToast,
   onCopy,
@@ -43,6 +57,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
 
   const [subject, setSubject] = useState('');
   const [classLevel, setClassLevel] = useState('');
+  const [customClassSelected, setCustomClassSelected] = useState(false);
   const [topic, setTopic] = useState('');
   const [count, setCount] = useState(5);
   const [difficulty, setDifficulty] = useState('medium');
@@ -55,9 +70,26 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
   const safeHistory = history.filter((item) => item && item.data);
   const [active, setActive] = useState<SavedAssessment | null>(safeHistory[0] ?? null);
   const [showAnswers, setShowAnswers] = useState(true);
+  const [printAnswerOverride, setPrintAnswerOverride] = useState<boolean | null>(null);
+
+  const effectiveShowAnswers = printAnswerOverride ?? showAnswers;
 
   useEffect(() => {
+    if (!prefill) return;
+    setSubject(prefill.subject);
+    setClassLevel(prefill.classLevel);
+    setCustomClassSelected(
+      Boolean(prefill.classLevel && !RWANDA_CLASSES.includes(prefill.classLevel))
+    );
+    setTopic(prefill.topic);
+    setErrorMsg(null);
+  }, [prefill]);
+
+  useEffect(() => {
+    const resetOverride = () => setPrintAnswerOverride(null);
+    window.addEventListener('afterprint', resetOverride);
     return () => {
+      window.removeEventListener('afterprint', resetOverride);
       abortRef.current?.abort();
     };
   }, []);
@@ -103,7 +135,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
       } catch (firstErr) {
         if (firstErr instanceof AiClientError && firstErr.isAborted) return;
         if (firstErr instanceof AiClientError && firstErr.isHighDemand) {
-          for (let sec = 4; sec >= 1; sec--) {
+          for (let sec = 3; sec >= 1; sec--) {
             if (controller.signal.aborted) return;
             setRetryCountdown(sec);
             await new Promise((r) => setTimeout(r, 1000));
@@ -151,9 +183,41 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
   const deleteItem = (id: string) => {
     const next = history.filter((item) => item.id !== id);
     onSaveHistory(next);
-    if (active?.id === id) setActive(next[0] ?? null);
+    if (active?.id === id) {
+      setPrintAnswerOverride(null);
+      setActive(next[0] ?? null);
+    }
     onToast(t('assess_deleted'), 'info');
   };
+
+  const handlePrint = (includeAnswers: boolean, target: SavedAssessment | null = active) => {
+    if (!target?.data) return;
+    flushSync(() => {
+      setActive(target);
+      setPrintAnswerOverride(includeAnswers);
+    });
+    printOrDownloadHtml({
+      filename: `Assessment_${target.subject}_${target.classLevel}_${
+        includeAnswers ? 'Teacher_Key' : 'Student_Copy'
+      }`.replace(/[^a-zA-Z0-9_-]+/g, '_'),
+      title: `${target.data.title || 'REB CBC Assessment'} (${
+        includeAnswers ? t('print_teacher_key') : t('print_student_copy')
+      })`,
+      innerHtml: assessmentToWordHtml(target.data, includeAnswers, lang),
+      onNotify: onToast,
+    });
+    if (isEmbeddedSandbox()) {
+      setPrintAnswerOverride(null);
+    }
+  };
+
+  const classSelectValue = customClassSelected
+    ? '__OTHER__'
+    : RWANDA_CLASSES.includes(classLevel)
+    ? classLevel
+    : classLevel
+    ? '__OTHER__'
+    : '';
 
   return (
     <section id="view-assessment" className="view-animate space-y-6">
@@ -187,18 +251,49 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
               className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
             />
           </label>
-          <label className="flex flex-col gap-1.5 text-xs font-semibold text-[var(--muted)]">
-            <span data-i18n="f_class">{t('f_class')} *</span>
-            <input
+          <div className="flex flex-col gap-1.5 text-xs font-semibold text-[var(--muted)]">
+            <label htmlFor="assessClass" data-i18n="f_class">
+              {t('f_class')} *
+            </label>
+            <select
               id="assessClass"
-              type="text"
-              value={classLevel}
-              onChange={(e) => setClassLevel(e.target.value)}
+              value={classSelectValue}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === '__OTHER__') {
+                  setCustomClassSelected(true);
+                  if (RWANDA_CLASSES.includes(classLevel)) {
+                    setClassLevel('');
+                  }
+                } else {
+                  setCustomClassSelected(false);
+                  setClassLevel(v);
+                }
+              }}
               disabled={loading}
-              placeholder={t('assess_ph_class')}
               className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
-            />
-          </label>
+            >
+              <option value="">{t('select_class')}</option>
+              {RWANDA_CLASSES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              <option value="__OTHER__">{t('class_other')}</option>
+            </select>
+            {classSelectValue === '__OTHER__' && (
+              <input
+                id="assessClassCustom"
+                type="text"
+                value={classLevel}
+                onChange={(e) => setClassLevel(e.target.value)}
+                disabled={loading}
+                aria-label={t('f_class_other')}
+                placeholder={t('assess_ph_class')}
+                className="mt-1 px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
+              />
+            )}
+          </div>
           <label className="flex flex-col gap-1.5 text-xs font-semibold text-[var(--muted)]">
             <span data-i18n="f_topic">{t('f_topic')} *</span>
             <input
@@ -248,6 +343,10 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
               className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
             >
               <option value="mcq" data-i18n="type_mcq">{t('type_mcq')}</option>
+              <option value="fill_blank" data-i18n="type_fill_blank">{t('type_fill_blank')}</option>
+              <option value="matching" data-i18n="type_matching">{t('type_matching')}</option>
+              <option value="true_false" data-i18n="type_true_false">{t('type_true_false')}</option>
+              <option value="open_ended" data-i18n="type_open_ended">{t('type_open_ended')}</option>
               <option value="short" data-i18n="type_short">{t('type_short')}</option>
               <option value="mixed" data-i18n="type_mixed">{t('type_mixed')}</option>
             </select>
@@ -341,6 +440,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
       {active?.data && (
         <div
           id="assessmentOutput"
+          data-print-answers={String(effectiveShowAnswers)}
           className="print-only-area holo-glass holo-reticle rounded-2xl border border-[#38bdf8]/30 overflow-hidden"
         >
           <div className="no-print px-5 py-3.5 border-b border-[var(--border)] bg-[var(--surface-subtle)] flex flex-wrap items-center justify-between gap-3">
@@ -358,21 +458,19 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  printOrDownloadHtml({
-                    filename: `Assessment_${active.subject}_${active.classLevel}`.replace(
-                      /[^a-zA-Z0-9_-]+/g,
-                      '_'
-                    ),
-                    title: active.data.title || 'REB CBC Assessment',
-                    innerHtml: assessmentToWordHtml(active.data, showAnswers, lang),
-                    onNotify: onToast,
-                  })
-                }
+                onClick={() => handlePrint(false)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[#15803D] transition-colors cursor-pointer whitespace-nowrap"
               >
                 <Printer className="w-3.5 h-3.5" />
-                <span data-i18n="print">{t('print')}</span>
+                <span>{t('print_student_copy')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePrint(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[#15803D]/40 bg-[var(--surface)] text-[#15803D] dark:text-[#4ade80] hover:border-[#15803D] transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>{t('print_teacher_key')}</span>
               </button>
               <button
                 id="copyAssessment"
@@ -423,13 +521,20 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
               {(active.data.questions ?? []).map((q) => (
                 <div key={q.number} className="space-y-2">
                   <div className="flex items-start justify-between gap-4">
-                    <p className="text-sm font-medium text-[var(--text)]">
+                    <p className="text-sm font-medium text-[var(--text)] whitespace-pre-wrap leading-relaxed">
                       <span className="font-mono-tabular font-bold mr-1.5">{q.number}.</span>
                       {q.question}
                     </p>
-                    <span className="font-mono-tabular text-xs font-semibold text-[var(--muted)] shrink-0">
-                      [{q.marks} {t('assess_pts')}]
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {q.type && (
+                        <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-[var(--surface-subtle)] border border-[var(--border)] text-[var(--muted)]">
+                          {t(`type_${q.type}`) !== `type_${q.type}` ? t(`type_${q.type}`) : q.type}
+                        </span>
+                      )}
+                      <span className="font-mono-tabular text-xs font-semibold text-[var(--muted)]">
+                        [{q.marks} {t('assess_pts')}]
+                      </span>
+                    </div>
                   </div>
                   {(q.options ?? []).length > 0 && (
                     <ul className="pl-6 space-y-1 text-sm text-[var(--text)]">
@@ -442,8 +547,8 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
               ))}
             </div>
 
-            {showAnswers && (
-              <div className="pt-5 border-t border-[var(--border)] space-y-3">
+            {effectiveShowAnswers && (
+              <div className="assessment-answer-key pt-5 border-t border-[var(--border)] space-y-3">
                 <h3 className="font-display text-base font-bold text-[#15803D] dark:text-[#4ade80]">
                   {t('assess_answer_key_title')}
                 </h3>
@@ -465,13 +570,13 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                           <td className="border border-[var(--border)] px-3 py-2 font-mono-tabular">
                             {q.number}
                           </td>
-                          <td className="border border-[var(--border)] px-3 py-2 font-medium">
+                          <td className="border border-[var(--border)] px-3 py-2 font-medium whitespace-pre-wrap">
                             {q.answer}
                           </td>
                           <td className="border border-[var(--border)] px-3 py-2 font-mono-tabular">
                             {q.marks}
                           </td>
-                          <td className="border border-[var(--border)] px-3 py-2 text-[var(--muted)]">
+                          <td className="border border-[var(--border)] px-3 py-2 text-[var(--muted)] whitespace-pre-wrap">
                             {q.markingNotes}
                           </td>
                         </tr>
@@ -538,22 +643,9 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setActive(item);
-                      setTimeout(() => {
-                        printOrDownloadHtml({
-                          filename: `Assessment_${item.subject}_${item.classLevel}`.replace(
-                            /[^a-zA-Z0-9_-]+/g,
-                            '_'
-                          ),
-                          title: item.data.title || 'REB CBC Assessment',
-                          innerHtml: assessmentToWordHtml(item.data, true, lang),
-                          onNotify: onToast,
-                        });
-                      }, 100);
-                    }}
+                    onClick={() => handlePrint(false, item)}
                     className="p-1.5 text-[var(--muted)] hover:text-[var(--text)] cursor-pointer"
-                    title={t('print_btn')}
+                    title={t('print_student_copy')}
                   >
                     <Printer className="w-4 h-4" />
                   </button>

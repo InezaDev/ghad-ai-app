@@ -3,6 +3,7 @@ import {
   ChatThread,
   GraphicsQuality,
   Lang,
+  LessonPlanData,
   SavedAssessment,
   SavedMethodology,
   SavedPlan,
@@ -17,6 +18,7 @@ const KEYS = {
   graphics: 'ghad_graphics_quality',
   profile: 'ghad_profile',
   plans: 'ghad_plans',
+  activePlanDraft: 'ghad_active_plan_draft',
   chats: 'ghad_chats',
   activeChat: 'ghad_active_chat',
   assessments: 'ghad_assessments',
@@ -169,6 +171,10 @@ export function loadPlans(): SavedPlan[] {
           unitTitle: typeof p.unitTitle === 'string' ? p.unitTitle : '',
           activityOverview: typeof p.activityOverview === 'string' ? p.activityOverview : '',
           instructionalObjective: objectiveText,
+          ...(typeof p.assessmentCriteria === 'string'
+            ? { assessmentCriteria: p.assessmentCriteria }
+            : {}),
+          ...(typeof p.homework === 'string' ? { homework: p.homework } : {}),
           stages: existingStages,
         },
       };
@@ -177,6 +183,24 @@ export function loadPlans(): SavedPlan[] {
 
 export function savePlans(plans: SavedPlan[]): void {
   writeJson(KEYS.plans, plans);
+}
+
+export function loadActivePlanDraft(): LessonPlanData | null {
+  const raw = readJson<LessonPlanData | null>(KEYS.activePlanDraft, null);
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.stages)) return null;
+  return raw;
+}
+
+export function saveActivePlanDraft(plan: LessonPlanData | null): void {
+  try {
+    if (plan) {
+      localStorage.setItem(KEYS.activePlanDraft, JSON.stringify(plan));
+    } else {
+      localStorage.removeItem(KEYS.activePlanDraft);
+    }
+  } catch {
+    // ignore storage quota errors silently
+  }
 }
 
 export function loadChats(): ChatThread[] {
@@ -284,6 +308,7 @@ export function buildBackupPayload(): AppBackup {
 
 export function clearAllStoredHistory(): void {
   savePlans([]);
+  saveActivePlanDraft(null);
   saveChats([]);
   saveActiveChatId(null);
   saveAssessments([]);

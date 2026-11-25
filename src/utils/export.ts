@@ -3,6 +3,7 @@ import {
   Lang,
   LessonPlanData,
   MethodologyData,
+  PrintOrientation,
 } from '../types/ghad';
 import { translate } from '../i18n/translations';
 
@@ -22,14 +23,20 @@ export function isEmbeddedSandbox(): boolean {
   }
 }
 
-export function downloadPrintableHtml(filename: string, title: string, innerHtml: string): void {
+export function downloadPrintableHtml(
+  filename: string,
+  title: string,
+  innerHtml: string,
+  orientation: PrintOrientation = 'portrait'
+): void {
+  const pageSize = orientation === 'landscape' ? 'A4 landscape' : 'A4 portrait';
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>${escHtml(title)}</title>
   <style>
-    @page { size: A4; margin: 12mm; }
+    @page { size: ${pageSize}; margin: 12mm; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #111827; margin: 18pt; }
     .print-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; margin-bottom: 14pt; background: #edf4ef; border: 1px solid #1f7a4d; border-radius: 8px; }
     .print-btn { background: #1f7a4d; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 10.5pt; }
@@ -67,20 +74,40 @@ export function printOrDownloadHtml(options: {
   filename: string;
   title: string;
   innerHtml: string;
+  orientation?: PrintOrientation;
   onNotify?: (msg: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
 }): void {
+  const orientation: PrintOrientation =
+    options.orientation === 'landscape' ? 'landscape' : 'portrait';
   if (isEmbeddedSandbox()) {
-    downloadPrintableHtml(options.filename, options.title, options.innerHtml);
+    downloadPrintableHtml(options.filename, options.title, options.innerHtml, orientation);
     options.onNotify?.(
       'Print dialog is restricted in embedded preview — downloaded a print-ready HTML file instead (open it in a tab to Print / Save as PDF, or use Download Word .doc).',
       'info'
     );
     return;
   }
+
+  let pageStyle = document.getElementById('ghad-print-page-style') as HTMLStyleElement | null;
+  if (!pageStyle) {
+    pageStyle = document.createElement('style');
+    pageStyle.id = 'ghad-print-page-style';
+    document.head.appendChild(pageStyle);
+  }
+  pageStyle.textContent = `@media print { @page { size: A4 ${orientation}; margin: 12mm; } }`;
   window.print();
 }
 
-export function downloadWordDoc(filename: string, title: string, innerHtml: string): void {
+export function downloadWordDoc(
+  filename: string,
+  title: string,
+  innerHtml: string,
+  orientation: PrintOrientation = 'portrait'
+): void {
+  const pageRule =
+    orientation === 'landscape'
+      ? 'size: 297mm 210mm; mso-page-orientation: landscape; margin: 12mm;'
+      : 'size: 210mm 297mm; mso-page-orientation: portrait; margin: 12mm;';
   const html = `<!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office"
       xmlns:w="urn:schemas-microsoft-com:office:word"
@@ -89,6 +116,8 @@ export function downloadWordDoc(filename: string, title: string, innerHtml: stri
   <meta charset="utf-8" />
   <title>${escHtml(title)}</title>
   <style>
+    @page WordSection1 { ${pageRule} }
+    div.WordSection1 { page: WordSection1; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #111827; margin: 18pt; }
     h1, h2, h3 { color: #111827; margin: 8pt 0 6pt; }
     table { width: 100%; border-collapse: collapse; margin: 0 0 6pt 0; page-break-inside: auto; }
@@ -101,7 +130,9 @@ export function downloadWordDoc(filename: string, title: string, innerHtml: stri
   </style>
 </head>
 <body>
+<div class="WordSection1">
 ${innerHtml}
+</div>
 </body>
 </html>`;
 
@@ -141,8 +172,13 @@ export function lessonPlanToPlainText(plan: LessonPlanData, lang: Lang): string 
         `${t('cbc_desc')}:\n` +
         `• ${t('cbc_teacher_act')}:\n${s.teacherActivities || '—'}\n` +
         `• ${t('cbc_learner_act')}:\n${s.learnerActivities || '—'}\n` +
-        `• ${t('cbc_generic')}:\n${s.competencesAndIssues || '—'}\n`
+        `• ${t('cbc_generic')}:\n${s.competencesAndIssues || '—'}\n` +
+        (s.observations?.trim() ? `• ${t('cbc_observations')}:\n${s.observations}\n` : '')
     ),
+    ...(plan.assessmentCriteria?.trim()
+      ? [`${t('cbc_assess_criteria')}: ${plan.assessmentCriteria}`]
+      : []),
+    ...(plan.homework?.trim() ? [`${t('cbc_homework')}: ${plan.homework}`] : []),
     `${t('cbc_eval')}: ${plan.teacherSelfEvaluation || '—'}`,
   ];
   return lines.join('\n');
@@ -216,13 +252,14 @@ export function lessonPlanToWordHtml(plan: LessonPlanData, lang: Lang): string {
     <table style="margin-top:0;">
       <thead style="display:table-header-group;">
         <tr style="mso-yfti-irow:0;mso-yfti-firstrow:yes;">
-          <th rowspan="2" style="width:15%;text-align:center;vertical-align:middle;">${escHtml(t('cbc_stages'))}</th>
-          <th colspan="2" style="width:57%;text-align:center;">${escHtml(t('cbc_desc'))}</th>
-          <th rowspan="2" style="width:28%;vertical-align:middle;">${escHtml(t('cbc_generic'))}</th>
+          <th rowspan="2" style="width:12%;text-align:center;vertical-align:middle;">${escHtml(t('cbc_stages'))}</th>
+          <th colspan="2" style="width:50%;text-align:center;">${escHtml(t('cbc_desc'))}</th>
+          <th rowspan="2" style="width:23%;vertical-align:middle;">${escHtml(t('cbc_generic'))}</th>
+          <th rowspan="2" style="width:15%;vertical-align:middle;">${escHtml(t('cbc_observations'))}</th>
         </tr>
         <tr style="mso-yfti-irow:1;">
-          <th style="width:28.5%;">${escHtml(t('cbc_teacher_act'))}</th>
-          <th style="width:28.5%;">${escHtml(t('cbc_learner_act'))}</th>
+          <th style="width:25%;">${escHtml(t('cbc_teacher_act'))}</th>
+          <th style="width:25%;">${escHtml(t('cbc_learner_act'))}</th>
         </tr>
       </thead>
       <tbody>
@@ -231,6 +268,7 @@ export function lessonPlanToWordHtml(plan: LessonPlanData, lang: Lang): string {
             ? `<tr>
             <td style="text-align:center;font-weight:bold;background:#f8faf9;">${escHtml(t('cbc_overview'))}</td>
             <td colspan="2" style="font-style:italic;background:#fff;">${escHtml(plan.activityOverview)}</td>
+            <td style="background:#f8faf9;"></td>
             <td style="background:#f8faf9;"></td>
           </tr>`
             : ''
@@ -246,12 +284,29 @@ export function lessonPlanToWordHtml(plan: LessonPlanData, lang: Lang): string {
             <td>${escHtml(s.teacherActivities)}</td>
             <td>${escHtml(s.learnerActivities)}</td>
             <td>${escHtml(s.competencesAndIssues)}</td>
+            <td>${escHtml(s.observations || '')}</td>
           </tr>`
           )
           .join('')}
+        ${
+          plan.assessmentCriteria?.trim()
+            ? `<tr>
+          <th style="text-align:center;vertical-align:middle;">${escHtml(t('cbc_assess_criteria'))}</th>
+          <td colspan="4">${escHtml(plan.assessmentCriteria)}</td>
+        </tr>`
+            : ''
+        }
+        ${
+          plan.homework?.trim()
+            ? `<tr>
+          <th style="text-align:center;vertical-align:middle;">${escHtml(t('cbc_homework'))}</th>
+          <td colspan="4">${escHtml(plan.homework)}</td>
+        </tr>`
+            : ''
+        }
         <tr>
           <th style="text-align:center;vertical-align:middle;">${escHtml(t('cbc_eval'))}</th>
-          <td colspan="3">${escHtml(plan.teacherSelfEvaluation)}</td>
+          <td colspan="4">${escHtml(plan.teacherSelfEvaluation)}</td>
         </tr>
       </tbody>
     </table>

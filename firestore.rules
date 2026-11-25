@@ -96,7 +96,7 @@ service cloud.firestore {
           'unitNo', 'lessonNo', 'durationMinutes', 'classSize', 'sen', 'unitTitle',
           'keyUnitCompetence', 'lessonTitle', 'instructionalObjective',
           'planLocation', 'learningMaterials', 'references', 'activityOverview',
-          'stages', 'teacherSelfEvaluation'
+          'stages', 'assessmentCriteria', 'homework', 'teacherSelfEvaluation'
         ]) &&
         p.schoolName is string && p.schoolName.size() <= 160 &&
         p.teacherName is string && p.teacherName.size() <= 120 &&
@@ -117,13 +117,16 @@ service cloud.firestore {
         p.learningMaterials is string && p.learningMaterials.size() <= 2000 &&
         p.references is string && p.references.size() <= 2000 &&
         p.activityOverview is string && p.activityOverview.size() <= 3000 &&
+        (!('assessmentCriteria' in p) || (p.assessmentCriteria is string && p.assessmentCriteria.size() <= 2000)) &&
+        (!('homework' in p) || (p.homework is string && p.homework.size() <= 2000)) &&
         p.teacherSelfEvaluation is string && p.teacherSelfEvaluation.size() <= 2000 &&
         p.stages is list && p.stages.size() <= 15 &&
         (p.stages.size() == 0 || (
           p.stages[0] is map &&
           p.stages[0].stageType is string && p.stages[0].stageType.size() <= 30 &&
           p.stages[0].stageName is string && p.stages[0].stageName.size() <= 120 &&
-          p.stages[0].timingMinutes is number
+          p.stages[0].timingMinutes is number &&
+          (!('observations' in p.stages[0]) || (p.stages[0].observations is string && p.stages[0].observations.size() <= 1500))
         ));
     }
 

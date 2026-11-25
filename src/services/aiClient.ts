@@ -61,9 +61,13 @@ async function postJson<T>(
         `Request failed (${response.status})`;
       const detail =
         data?.details || (data?.error && data.error !== baseMsg ? data.error : undefined);
-      const msg = detail && detail !== baseMsg ? `${baseMsg} (${detail})` : baseMsg;
+      const isHighDemand = response.status === 503 || response.status === 429;
+      if (detail && detail !== baseMsg) {
+        console.warn(`[GHAD AI] ${url} (${response.status}):`, detail);
+      }
+      const msg = !isHighDemand && detail && detail !== baseMsg ? `${baseMsg} (${detail})` : baseMsg;
       throw new AiClientError(msg, response.status, {
-        isHighDemand: response.status === 503 || response.status === 429,
+        isHighDemand,
       });
     }
 
@@ -179,6 +183,7 @@ export async function requestAssistantReply(params: {
   lang: Lang;
   message: string;
   history: Array<{ role: 'user' | 'model'; text: string }>;
+  useWebSearch?: boolean;
   signal?: AbortSignal;
 }): Promise<AssistantReplyResult> {
   return enqueueAiRequest(async () => {
@@ -192,6 +197,7 @@ export async function requestAssistantReply(params: {
         language: params.lang,
         message: params.message,
         history: params.history,
+        useWebSearch: params.useWebSearch ?? true,
       },
       params.signal
     );

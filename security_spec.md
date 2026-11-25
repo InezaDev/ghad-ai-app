@@ -5,7 +5,7 @@
 2. **Master Gate Relational Integrity**: Subcollection writes (`plans`, `chats`, `assessments`, `methodologies`, `private`) verify that the parent `/users/{userId}` document exists and has `data.uid == request.auth.uid` via `get()`.
 3. **PII Isolation**: Email addresses and teacher/school identity fields live exclusively in `/users/{userId}/private/profile` (never in `/users/{userId}`), with `allow list: if false` and `allow get: if isVerifiedOwner(userId)`.
 4. **Immortal Identity & Temporal Integrity**: `uid`, `id`, and `createdAt` cannot be modified after creation; `createdAt == request.time` on create and `updatedAt == request.time` on create/update.
-5. **Bounded Payloads & Strict Keys**: Every collection validates `keys().hasAll(...) && keys().hasOnly(...)` on create, `affectedKeys().hasOnly(...)` on update, string `.size()` bounds, regex ID validation (`^[a-zA-Z0-9_\-]+$`), and bounded array lengths (`stages.size() <= 15`, `messages.size() <= 100`, `questions.size() <= 40`, `strategies.size() <= 20`).
+5. **Bounded Payloads & Strict Keys**: Every collection validates `keys().hasAll(...) && keys().hasOnly(...)` on create, `affectedKeys().hasOnly(...)` on update, string `.size()` bounds (including optional REB `assessmentCriteria` <= 2000, `homework` <= 2000, and stage `observations` <= 1500), regex ID validation (`^[a-zA-Z0-9_\-]+$`), and bounded array lengths (`stages.size() <= 15`, `messages.size() <= 100`, `questions.size() <= 40`, `strategies.size() <= 20`).
 6. **Secure List Queries**: `allow list` on subcollections explicitly validates `isVerifiedOwner(userId) && resource.data.uid == request.auth.uid` without calling `get()`/`exists()` inside `list`.
 
 ## 2. The "Dirty Dozen" Attack Payloads (All Must Fail with PERMISSION_DENIED)
