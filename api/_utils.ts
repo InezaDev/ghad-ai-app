@@ -37,3 +37,70 @@ export function parseRequestBody(rawBody: unknown): ParsedBodyResult | ParsedBod
 
   return { ok: false, error: 'Unsupported request body format.' };
 }
+
+export interface ApiRequest {
+  method?: string;
+  body?: unknown;
+}
+
+export interface ApiResponse {
+  status: (code: number) => ApiResponse;
+  json: (payload: unknown) => void;
+  end?: () => void;
+}
+
+export interface ApiErrorPayload {
+  status: number;
+  message: string;
+  error: string;
+  code?: string;
+  route?: string;
+}
+
+export interface NormalizedErrorInput {
+  status: number;
+  body: {
+    error: string;
+    status: number;
+    code?: string;
+    details?: string;
+  };
+}
+
+export function buildApiErrorResponse(
+  err: unknown,
+  formatError: (error: unknown) => NormalizedErrorInput,
+  route?: string
+): { status: number; payload: ApiErrorPayload } {
+  const { status, body } = formatError(err);
+  const message = body.error || 'Internal server error.';
+  const errorDetail = body.details || body.error || (err instanceof Error ? err.message : String(err));
+
+  return {
+    status,
+    payload: {
+      status,
+      message,
+      error: errorDetail,
+      ...(body.code ? { code: body.code } : {}),
+      ...(route ? { route } : {}),
+    },
+  };
+}
+
+export function withApiErrorHandler<Req extends ApiRequest, Res extends ApiResponse>(
+  route: string,
+  formatError: (error: unknown) => NormalizedErrorInput,
+  handler: (req: Req, res: Res) => Promise<void> | void
+) {
+  return async (req: Req, res: Res): Promise<void> => {
+    try {
+      await handler(req, res);
+    } catch (err) {
+      console.error(`[GHAD AI ${route}]`, err);
+      const { status, payload } = buildApiErrorResponse(err, formatError, route);
+      res.status(status).json(payload);
+    }
+  };
+}
+

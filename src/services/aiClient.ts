@@ -31,12 +31,47 @@ async function postJson<T>(
       signal,
     });
 
-    const data = (await response.json().catch(() => ({}))) as T & { error?: string };
+    const rawText = await response.text();
+    let data: (T & {
+      error?: string;
+      message?: string;
+      details?: string;
+      status?: number;
+      code?: string;
+    }) | null = null;
+    if (rawText) {
+      try {
+        data = JSON.parse(rawText) as T & {
+          error?: string;
+          message?: string;
+          details?: string;
+          status?: number;
+          code?: string;
+        };
+      } catch {
+        data = null;
+      }
+    }
+
     if (!response.ok) {
-      const msg = data?.error || `Request failed (${response.status})`;
+      const baseMsg =
+        data?.message ||
+        data?.error ||
+        (rawText && !rawText.trim().startsWith('<') ? rawText.trim().slice(0, 300) : '') ||
+        `Request failed (${response.status})`;
+      const detail =
+        data?.details || (data?.error && data.error !== baseMsg ? data.error : undefined);
+      const msg = detail && detail !== baseMsg ? `${baseMsg} (${detail})` : baseMsg;
       throw new AiClientError(msg, response.status, {
         isHighDemand: response.status === 503 || response.status === 429,
       });
+    }
+
+    if (!data) {
+      throw new AiClientError(
+        `Server returned an unexpected non-JSON response (${response.status}).`,
+        502
+      );
     }
     return data;
   } catch (err: unknown) {

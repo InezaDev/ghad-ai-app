@@ -5,12 +5,13 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import {
   ExistingLessonDraft,
+  formatErrorResponse,
   generateAssistantReply,
   generateRebAssessment,
   generateRebLessonPlan,
   generateRebMethodology,
-  normalizeError,
 } from './server/aiService.js';
+import { withApiErrorHandler } from './api/_utils.js';
 
 dotenv.config();
 
@@ -22,16 +23,23 @@ async function startServer() {
   const app = express();
   app.use(express.json({ limit: '4mb' }));
 
-  app.get('/api/health', (_req: Request, res: Response) => {
-    res.json({
-      ok: true,
-      service: 'ghad-ai',
-      timestamp: new Date().toISOString(),
-    });
-  });
+  app.get(
+    '/api/health',
+    withApiErrorHandler<Request, Response>('/api/health', formatErrorResponse, (_req, res) => {
+      const apiKey = process.env.GEMINI_API_KEY?.trim();
+      const geminiConfigured = Boolean(apiKey && apiKey !== 'MY_GEMINI_API_KEY');
+      res.json({
+        ok: true,
+        service: 'ghad-ai',
+        geminiConfigured,
+        timestamp: new Date().toISOString(),
+      });
+    })
+  );
 
-  app.post('/api/lesson', async (req: Request, res: Response) => {
-    try {
+  app.post(
+    '/api/lesson',
+    withApiErrorHandler<Request, Response>('/api/lesson', formatErrorResponse, async (req, res) => {
       const body = req.body || {};
       const existingPlan =
         body.existingPlan && typeof body.existingPlan === 'object'
@@ -45,12 +53,22 @@ async function startServer() {
       const unitNo = String(body.unitNo || body.unit || existingPlan?.unitNo || '').trim();
 
       if (!subject || !classLevel) {
-        res.status(400).json({ error: 'Subject and Class level are required.' });
+        res.status(400).json({
+          status: 400,
+          message: 'Subject and Class level are required.',
+          error: 'Subject and Class level are required.',
+          route: '/api/lesson',
+        });
         return;
       }
 
       if (!topic && !unitTitle && !unitNo && !existingPlan) {
-        res.status(400).json({ error: 'Please provide a Lesson Topic or Unit details.' });
+        res.status(400).json({
+          status: 400,
+          message: 'Please provide a Lesson Topic or Unit details.',
+          error: 'Please provide a Lesson Topic or Unit details.',
+          route: '/api/lesson',
+        });
         return;
       }
 
@@ -75,18 +93,21 @@ async function startServer() {
       });
 
       res.json({ plan });
-    } catch (err) {
-      const { status, message } = normalizeError(err);
-      res.status(status).json({ error: message });
-    }
-  });
+    })
+  );
 
-  app.post('/api/assistant', async (req: Request, res: Response) => {
-    try {
+  app.post(
+    '/api/assistant',
+    withApiErrorHandler<Request, Response>('/api/assistant', formatErrorResponse, async (req, res) => {
       const body = req.body || {};
       const message = String(body.message || '').trim();
       if (!message) {
-        res.status(400).json({ error: 'Please enter a question or message.' });
+        res.status(400).json({
+          status: 400,
+          message: 'Please enter a question or message.',
+          error: 'Please enter a question or message.',
+          route: '/api/assistant',
+        });
         return;
       }
 
@@ -97,21 +118,24 @@ async function startServer() {
       });
 
       res.json({ reply: result.reply, sources: result.sources });
-    } catch (err) {
-      const { status, message } = normalizeError(err);
-      res.status(status).json({ error: message });
-    }
-  });
+    })
+  );
 
-  app.post('/api/assessment', async (req: Request, res: Response) => {
-    try {
+  app.post(
+    '/api/assessment',
+    withApiErrorHandler<Request, Response>('/api/assessment', formatErrorResponse, async (req, res) => {
       const body = req.body || {};
       const subject = String(body.subject || '').trim();
       const classLevel = String(body.classLevel || body.class || '').trim();
       const topic = String(body.topic || '').trim();
 
       if (!subject || !classLevel || !topic) {
-        res.status(400).json({ error: 'Subject, class level, and topic are required.' });
+        res.status(400).json({
+          status: 400,
+          message: 'Subject, class level, and topic are required.',
+          error: 'Subject, class level, and topic are required.',
+          route: '/api/assessment',
+        });
         return;
       }
 
@@ -126,21 +150,24 @@ async function startServer() {
       });
 
       res.json({ assessment });
-    } catch (err) {
-      const { status, message } = normalizeError(err);
-      res.status(status).json({ error: message });
-    }
-  });
+    })
+  );
 
-  app.post('/api/methodology', async (req: Request, res: Response) => {
-    try {
+  app.post(
+    '/api/methodology',
+    withApiErrorHandler<Request, Response>('/api/methodology', formatErrorResponse, async (req, res) => {
       const body = req.body || {};
       const subject = String(body.subject || '').trim();
       const classLevel = String(body.classLevel || body.class || '').trim();
       const topic = String(body.topic || '').trim();
 
       if (!subject || !classLevel || !topic) {
-        res.status(400).json({ error: 'Subject, class level, and topic are required.' });
+        res.status(400).json({
+          status: 400,
+          message: 'Subject, class level, and topic are required.',
+          error: 'Subject, class level, and topic are required.',
+          route: '/api/methodology',
+        });
         return;
       }
 
@@ -153,11 +180,8 @@ async function startServer() {
       });
 
       res.json({ methodology });
-    } catch (err) {
-      const { status, message } = normalizeError(err);
-      res.status(status).json({ error: message });
-    }
-  });
+    })
+  );
 
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');

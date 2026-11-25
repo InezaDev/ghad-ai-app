@@ -1,38 +1,45 @@
-import { generateAssistantReply, normalizeError } from '../server/aiService.js';
-import { parseRequestBody } from './_utils.js';
+import { formatErrorResponse, generateAssistantReply } from '../server/aiService.js';
+import { ApiRequest, ApiResponse, parseRequestBody, withApiErrorHandler } from './_utils.js';
 
-interface VercelReq {
-  method?: string;
-  body?: unknown;
-}
+export default withApiErrorHandler<ApiRequest, ApiResponse>(
+  '/api/assistant',
+  formatErrorResponse,
+  async (req, res) => {
+    if (req.method === 'OPTIONS') {
+      res.status(204);
+      if (res.end) res.end();
+      else res.json({});
+      return;
+    }
+    if (req.method !== 'POST') {
+      res.status(405).json({
+        status: 405,
+        message: 'Method not allowed',
+        error: 'Method not allowed',
+        route: '/api/assistant',
+      });
+      return;
+    }
 
-interface VercelRes {
-  status: (code: number) => VercelRes;
-  json: (payload: unknown) => void;
-  end?: () => void;
-}
-
-export default async function handler(req: VercelReq, res: VercelRes) {
-  if (req.method === 'OPTIONS') {
-    res.status(204);
-    if (res.end) res.end();
-    else res.json({});
-    return;
-  }
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-  try {
     const parsedBody = parseRequestBody(req.body);
     if (!parsedBody.ok) {
-      res.status(400).json({ error: parsedBody.error });
+      res.status(400).json({
+        status: 400,
+        message: parsedBody.error,
+        error: parsedBody.error,
+        route: '/api/assistant',
+      });
       return;
     }
     const body = parsedBody.body;
     const message = String(body.message || '').trim();
     if (!message) {
-      res.status(400).json({ error: 'Please enter a question or message.' });
+      res.status(400).json({
+        status: 400,
+        message: 'Please enter a question or message.',
+        error: 'Please enter a question or message.',
+        route: '/api/assistant',
+      });
       return;
     }
 
@@ -45,9 +52,6 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     });
 
     res.status(200).json({ reply: result.reply, sources: result.sources });
-  } catch (err) {
-    console.error('[GHAD AI /api/assistant]', err);
-    const { status, message } = normalizeError(err);
-    res.status(status).json({ error: message });
   }
-}
+);
+

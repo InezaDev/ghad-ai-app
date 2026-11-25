@@ -2,7 +2,7 @@ import { GenerateContentParameters, GoogleGenAI, ThinkingLevel, Type } from '@go
 
 export type SupportedLang = 'en' | 'rw' | 'fr' | 'sw';
 
-const MODEL_CHAIN = ['gemini-2.5-flash', 'gemini-4-hydrogen', 'gemini-3.1-flash-lite'] as const;
+const MODEL_CHAIN = ['gemini-4-hydrogen', 'gemini-3.1-flash-lite'] as const;
 
 export class AiServiceHttpError extends Error {
   status: number;
@@ -13,7 +13,7 @@ export class AiServiceHttpError extends Error {
 }
 
 function getAiClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
     return null;
   }
@@ -30,28 +30,77 @@ function getAiClient(): GoogleGenAI | null {
 const MODEL_COOLDOWN_MS = 15_000;
 const modelCooldownUntil: Record<string, number> = {};
 
+function redactPotentialSecrets(text: string): string {
+  return text.replace(/AIza[0-9A-Za-z\-_]{20,}/g, '[REDACTED_API_KEY]');
+}
+
 function extractErrorText(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
   try {
-    const parsed = JSON.parse(raw) as { error?: { message?: string } };
-    if (parsed?.error?.message) return parsed.error.message;
+    const parsed = JSON.parse(raw) as { error?: { message?: string; status?: string } };
+    if (parsed?.error?.message) return redactPotentialSecrets(parsed.error.message);
   } catch {
     // Not raw JSON
   }
-  return raw;
+  return redactPotentialSecrets(raw);
+}
+
+function extractErrorStatus(err: unknown): number | undefined {
+  const status =
+    (err as { status?: number; code?: number; statusCode?: number })?.status ??
+    (err as { code?: number })?.code ??
+    (err as { statusCode?: number })?.statusCode;
+  if (typeof status === 'number' && status >= 400 && status <= 599) {
+    return status;
+  }
+  const raw = err instanceof Error ? err.message : String(err);
+  try {
+    const parsed = JSON.parse(raw) as { error?: { code?: number } };
+    if (typeof parsed?.error?.code === 'number') return parsed.error.code;
+  } catch {
+    // Not raw JSON
+  }
+  return undefined;
+}
+
+function extractErrorCode(err: unknown): string | undefined {
+  const raw = err instanceof Error ? err.message : String(err);
+  try {
+    const parsed = JSON.parse(raw) as { error?: { status?: string } };
+    if (typeof parsed?.error?.status === 'string') return parsed.error.status;
+  } catch {
+    // Not raw JSON
+  }
+  const upper = raw.toUpperCase();
+  for (const known of [
+    'API_KEY_INVALID',
+    'PERMISSION_DENIED',
+    'UNAUTHENTICATED',
+    'RESOURCE_EXHAUSTED',
+    'NOT_FOUND',
+    'INVALID_ARGUMENT',
+    'UNAVAILABLE',
+    'DEADLINE_EXCEEDED',
+  ]) {
+    if (upper.includes(known)) return known;
+  }
+  return undefined;
 }
 
 function isAuthOrKeyError(err: unknown): boolean {
+  const status = extractErrorStatus(err);
+  if (status === 401 || status === 403) return true;
   const raw = (err instanceof Error ? err.message : String(err)).toUpperCase();
   return (
     raw.includes('PERMISSION_DENIED') ||
+    raw.includes('UNAUTHENTICATED') ||
     raw.includes('API_KEY_INVALID') ||
     raw.includes('API KEY NOT VALID')
   );
 }
 
 function isUnavailableOrRateLimitError(err: unknown): boolean {
-  const status = (err as { status?: number; code?: number })?.status ?? (err as { code?: number })?.code;
+  const status = extractErrorStatus(err);
   if (status === 503 || status === 429) return true;
   const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
   return (
@@ -109,9 +158,7 @@ function buildConfigForModel(
 ): GenerateContentParameters['config'] {
   if (!baseConfig) return baseConfig;
   const nextConfig = { ...baseConfig };
-  if (model === 'gemini-2.5-flash') {
-    delete nextConfig.thinkingConfig;
-  } else if (model === 'gemini-3.1-flash-lite') {
+  if (model === 'gemini-3.1-flash-lite') {
     nextConfig.thinkingConfig = { thinkingLevel: ThinkingLevel.MINIMAL };
   } else {
     nextConfig.thinkingConfig = { thinkingLevel: ThinkingLevel.LOW };
@@ -194,42 +241,104 @@ function parseJsonSafely<T>(rawText: string, label: string): T {
   }
 }
 
-export function normalizeError(err: unknown): { status: number; message: string } {
+export interface NormalizedAiError {
+  status: number;
+  message: string;
+  code?: string;
+  details?: string;
+}
+
+export function normalizeError(err: unknown): NormalizedAiError {
   if (err instanceof AiServiceHttpError) {
-    return { status: err.status, message: err.message };
-  }
-  const raw = err instanceof Error ? err.message : String(err);
-  const cleanMsg = extractErrorText(err);
-  if (
-    raw.includes('PERMISSION_DENIED') ||
-    raw.includes('API_KEY_INVALID') ||
-    raw.includes('403')
-  ) {
     return {
-      status: 400,
-      message: 'Invalid or unauthorized Gemini API key. Please check Settings > Secrets.',
+      status: err.status,
+      message: redactPotentialSecrets(err.message),
+      code: err.status === 503 ? 'GEMINI_UNAVAILABLE' : 'AI_SERVICE_ERROR',
     };
   }
-  if (raw.includes('UNAVAILABLE') || raw.includes('503') || raw.toLowerCase().includes('high demand')) {
+
+  const raw = err instanceof Error ? err.message : String(err);
+  const cleanMsg = extractErrorText(err);
+  const upstreamStatus = extractErrorStatus(err);
+  const code = extractErrorCode(err);
+  const upper = raw.toUpperCase();
+
+  if (
+    upstreamStatus === 401 ||
+    upstreamStatus === 403 ||
+    upper.includes('PERMISSION_DENIED') ||
+    upper.includes('UNAUTHENTICATED') ||
+    upper.includes('API_KEY_INVALID') ||
+    upper.includes('API KEY NOT VALID')
+  ) {
+    return {
+      status: upstreamStatus === 401 || upstreamStatus === 403 ? upstreamStatus : 400,
+      message: 'Invalid or unauthorized Gemini API key. Check GEMINI_API_KEY in Settings > Secrets or Vercel Environment Variables.',
+      code: code || 'API_KEY_INVALID',
+      details: cleanMsg,
+    };
+  }
+  if (
+    upstreamStatus === 503 ||
+    upper.includes('UNAVAILABLE') ||
+    raw.toLowerCase().includes('high demand')
+  ) {
     return {
       status: 503,
       message:
         'The AI service is temporarily experiencing high demand. Please wait a few seconds and click Retry.',
+      code: code || 'UNAVAILABLE',
+      details: cleanMsg,
     };
   }
-  if (raw.includes('RESOURCE_EXHAUSTED') || raw.includes('429')) {
+  if (upstreamStatus === 429 || upper.includes('RESOURCE_EXHAUSTED')) {
     return {
       status: 429,
       message: 'AI rate limit reached temporarily. Please wait a few seconds and retry.',
+      code: code || 'RESOURCE_EXHAUSTED',
+      details: cleanMsg,
     };
   }
-  if (raw.includes('NOT_FOUND') || raw.includes('404')) {
+  if (upstreamStatus === 404 || upper.includes('NOT_FOUND')) {
     return {
       status: 404,
-      message: cleanMsg,
+      message: cleanMsg || 'Requested Gemini model or endpoint was not found.',
+      code: code || 'NOT_FOUND',
+      details: cleanMsg,
     };
   }
-  return { status: 500, message: cleanMsg || 'Unable to reach Gemini AI service.' };
+  if (upstreamStatus === 400 || upper.includes('INVALID_ARGUMENT')) {
+    return {
+      status: 400,
+      message: cleanMsg || 'Invalid request sent to Gemini API.',
+      code: code || 'INVALID_ARGUMENT',
+      details: cleanMsg,
+    };
+  }
+  return {
+    status: upstreamStatus || 500,
+    message: cleanMsg || 'Unable to reach Gemini AI service.',
+    ...(code ? { code } : {}),
+    ...(cleanMsg ? { details: cleanMsg } : {}),
+  };
+}
+
+export function formatErrorResponse(err: unknown): {
+  status: number;
+  body: { error: string; status: number; code?: string; details?: string };
+} {
+  const normalized = normalizeError(err);
+  return {
+    status: normalized.status,
+    body: {
+      error: normalized.message,
+      status: normalized.status,
+      ...(normalized.code ? { code: normalized.code } : {}),
+      ...(normalized.details && normalized.details !== normalized.message
+        ? { details: normalized.details }
+        : {}),
+    },
+  };
 }
 
 const CBC_LOCALIZATION: Record<
@@ -873,12 +982,22 @@ export async function generateAssistantReply(input: AssistantTurnInput): Promise
   if (Array.isArray(input.history)) {
     for (const item of input.history.slice(-24)) {
       if (item && typeof item.text === 'string' && item.text.trim()) {
-        contents.push({
-          role: item.role === 'user' ? 'user' : 'model',
-          parts: [{ text: item.text.trim() }],
-        });
+        const role: 'user' | 'model' = item.role === 'user' ? 'user' : 'model';
+        const text = item.text.trim();
+        if (contents.length === 0 && role === 'model') {
+          continue;
+        }
+        const prev = contents[contents.length - 1];
+        if (prev && prev.role === role) {
+          prev.parts[0].text = `${prev.parts[0].text}\n\n${text}`;
+        } else {
+          contents.push({ role, parts: [{ text }] });
+        }
       }
     }
+  }
+  while (contents.length > 0 && contents[contents.length - 1].role === 'user') {
+    contents.pop();
   }
   contents.push({ role: 'user', parts: [{ text: input.message.trim() }] });
 
