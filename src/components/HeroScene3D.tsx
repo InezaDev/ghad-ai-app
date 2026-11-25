@@ -74,7 +74,7 @@ function createRebPageTexture(side: 'left' | 'right', maxAniso: number): THREE.C
       // Identification grid rows
       const rows = [
         ['Term / Date', 'Term 1 · P1–S6'],
-        ['Subject', 'Mathematics / SRS'],
+        ['Subject', 'Mathematics / SRE'],
         ['Unit Title', 'Competence Unit'],
         ['Key Competence', 'To apply & explain'],
         ['Objective', 'Condition · Who · Action'],

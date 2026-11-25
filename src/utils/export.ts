@@ -147,6 +147,20 @@ ${innerHtml}
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+export function formatQuestionMarks(marks: number, lang: Lang = 'en'): string {
+  const count = Number(marks) || 0;
+  if (lang === 'rw') {
+    return count === 1 ? 'inota 1' : `amanota ${count}`;
+  }
+  if (lang === 'fr') {
+    return count === 1 ? '1 point' : `${count} points`;
+  }
+  if (lang === 'sw') {
+    return count === 1 ? 'alama 1' : `alama ${count}`;
+  }
+  return count === 1 ? '1 mark' : `${count} marks`;
+}
+
 export function lessonPlanToPlainText(plan: LessonPlanData, lang: Lang): string {
   const t = (k: string) => translate(lang, k);
   const stages = Array.isArray(plan.stages) ? plan.stages : [];
@@ -172,13 +186,8 @@ export function lessonPlanToPlainText(plan: LessonPlanData, lang: Lang): string 
         `${t('cbc_desc')}:\n` +
         `• ${t('cbc_teacher_act')}:\n${s.teacherActivities || '—'}\n` +
         `• ${t('cbc_learner_act')}:\n${s.learnerActivities || '—'}\n` +
-        `• ${t('cbc_generic')}:\n${s.competencesAndIssues || '—'}\n` +
-        (s.observations?.trim() ? `• ${t('cbc_observations')}:\n${s.observations}\n` : '')
+        `• ${t('cbc_generic')}:\n${s.competencesAndIssues || '—'}\n`
     ),
-    ...(plan.assessmentCriteria?.trim()
-      ? [`${t('cbc_assess_criteria')}: ${plan.assessmentCriteria}`]
-      : []),
-    ...(plan.homework?.trim() ? [`${t('cbc_homework')}: ${plan.homework}`] : []),
     `${t('cbc_eval')}: ${plan.teacherSelfEvaluation || '—'}`,
   ];
   return lines.join('\n');
@@ -252,14 +261,13 @@ export function lessonPlanToWordHtml(plan: LessonPlanData, lang: Lang): string {
     <table style="margin-top:0;">
       <thead style="display:table-header-group;">
         <tr style="mso-yfti-irow:0;mso-yfti-firstrow:yes;">
-          <th rowspan="2" style="width:12%;text-align:center;vertical-align:middle;">${escHtml(t('cbc_stages'))}</th>
-          <th colspan="2" style="width:50%;text-align:center;">${escHtml(t('cbc_desc'))}</th>
-          <th rowspan="2" style="width:23%;vertical-align:middle;">${escHtml(t('cbc_generic'))}</th>
-          <th rowspan="2" style="width:15%;vertical-align:middle;">${escHtml(t('cbc_observations'))}</th>
+          <th rowspan="2" style="width:15%;text-align:center;vertical-align:middle;">${escHtml(t('cbc_stages'))}</th>
+          <th colspan="2" style="width:55%;text-align:center;">${escHtml(t('cbc_desc'))}</th>
+          <th rowspan="2" style="width:30%;vertical-align:middle;">${escHtml(t('cbc_generic'))}</th>
         </tr>
         <tr style="mso-yfti-irow:1;">
-          <th style="width:25%;">${escHtml(t('cbc_teacher_act'))}</th>
-          <th style="width:25%;">${escHtml(t('cbc_learner_act'))}</th>
+          <th style="width:27.5%;">${escHtml(t('cbc_teacher_act'))}</th>
+          <th style="width:27.5%;">${escHtml(t('cbc_learner_act'))}</th>
         </tr>
       </thead>
       <tbody>
@@ -268,7 +276,6 @@ export function lessonPlanToWordHtml(plan: LessonPlanData, lang: Lang): string {
             ? `<tr>
             <td style="text-align:center;font-weight:bold;background:#f8faf9;">${escHtml(t('cbc_overview'))}</td>
             <td colspan="2" style="font-style:italic;background:#fff;">${escHtml(plan.activityOverview)}</td>
-            <td style="background:#f8faf9;"></td>
             <td style="background:#f8faf9;"></td>
           </tr>`
             : ''
@@ -284,29 +291,12 @@ export function lessonPlanToWordHtml(plan: LessonPlanData, lang: Lang): string {
             <td>${escHtml(s.teacherActivities)}</td>
             <td>${escHtml(s.learnerActivities)}</td>
             <td>${escHtml(s.competencesAndIssues)}</td>
-            <td>${escHtml(s.observations || '')}</td>
           </tr>`
           )
           .join('')}
-        ${
-          plan.assessmentCriteria?.trim()
-            ? `<tr>
-          <th style="text-align:center;vertical-align:middle;">${escHtml(t('cbc_assess_criteria'))}</th>
-          <td colspan="4">${escHtml(plan.assessmentCriteria)}</td>
-        </tr>`
-            : ''
-        }
-        ${
-          plan.homework?.trim()
-            ? `<tr>
-          <th style="text-align:center;vertical-align:middle;">${escHtml(t('cbc_homework'))}</th>
-          <td colspan="4">${escHtml(plan.homework)}</td>
-        </tr>`
-            : ''
-        }
         <tr>
           <th style="text-align:center;vertical-align:middle;">${escHtml(t('cbc_eval'))}</th>
-          <td colspan="4">${escHtml(plan.teacherSelfEvaluation)}</td>
+          <td colspan="3">${escHtml(plan.teacherSelfEvaluation)}</td>
         </tr>
       </tbody>
     </table>
@@ -326,14 +316,14 @@ export function assessmentToPlainText(
     '',
     ...data.questions.map((q) => {
       const opts = q.options.length ? '\n' + q.options.map((o) => `   ${o}`).join('\n') : '';
-      return `${q.number}. ${q.question} (${q.marks} ${t('assess_marks_unit')})${opts}`;
+      return `${q.number}. ${q.question} (${formatQuestionMarks(q.marks, lang)})${opts}`;
     }),
   ];
 
   if (includeAnswers) {
     lines.push('', t('assess_answer_key_title').toUpperCase(), '========================================');
     data.questions.forEach((q) => {
-      lines.push(`${q.number}. ${t('assess_col_answer')}: ${q.answer} (${q.marks} ${t('assess_marks_unit')})`);
+      lines.push(`${q.number}. ${t('assess_col_answer')}: ${q.answer} (${formatQuestionMarks(q.marks, lang)})`);
       if (q.markingNotes) lines.push(`   ${t('assess_col_notes')}: ${q.markingNotes}`);
     });
   }
@@ -355,7 +345,7 @@ export function assessmentToWordHtml(
       .map(
         (q) => `
       <div style="margin-bottom:10pt;">
-        <p><strong>${q.number}. ${escHtml(q.question)}</strong> <em>(${q.marks} ${escHtml(t('assess_marks_unit'))})</em></p>
+        <p><strong>${q.number}. ${escHtml(q.question)}</strong> <em>(${escHtml(formatQuestionMarks(q.marks, lang))})</em></p>
         ${
           q.options.length
             ? `<ul style="list-style:none;padding-left:14pt;">${q.options

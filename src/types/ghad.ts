@@ -9,7 +9,8 @@ export type ViewName =
   | 'methodology'
   | 'library'
   | 'resources'
-  | 'settings';
+  | 'settings'
+  | 'admin';
 
 export type StageType = 'intro' | 'development' | 'conclusion';
 

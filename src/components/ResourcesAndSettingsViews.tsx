@@ -94,6 +94,7 @@ interface SettingsViewProps {
   onSaveProfile: (profile: TeacherProfile) => void;
   onImportBackup: (backup: AppBackup) => void;
   onClearAll: () => void;
+  onOpenAdmin?: () => void;
   onToast: (msg: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
 }
 
@@ -108,6 +109,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onSaveProfile,
   onImportBackup,
   onClearAll,
+  onOpenAdmin,
   onToast,
 }) => {
   const t = (k: string) => translate(lang, k);
@@ -387,6 +389,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               )}
             </div>
           </div>
+
+          {onOpenAdmin && (
+            <div className="holo-glass holo-reticle p-6 rounded-2xl border border-[var(--primary)]/30 space-y-3">
+              <h2 className="font-display text-base font-bold text-[var(--text)]">Admin Portal & Redis KV</h2>
+              <p className="text-xs text-[var(--muted)]">Manage site settings, usage analytics, activity logs, feedback inbox, and developer profile.</p>
+              <button
+                type="button"
+                onClick={onOpenAdmin}
+                className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl bg-[var(--primary)] text-white hover:opacity-95 transition cursor-pointer"
+              >
+                <span>Open Admin Dashboard</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </section>

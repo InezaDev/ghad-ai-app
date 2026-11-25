@@ -12,6 +12,19 @@ import {
   generateRebMethodology,
 } from './server/aiService.js';
 import { withApiErrorHandler } from './api/_utils.js';
+import {
+  deleteTeacherFeedback,
+  getActivityLogs,
+  getAnalyticsStats,
+  getDeveloperProfile,
+  getSiteSettings,
+  getTeacherFeedbackList,
+  recordActivity,
+  saveDeveloperProfile,
+  saveSiteSettings,
+  submitTeacherFeedback,
+  verifyAdminPassword,
+} from './server/adminService.js';
 
 dotenv.config();
 
@@ -92,6 +105,7 @@ async function startServer() {
         existingPlan,
       });
 
+      await recordActivity('lesson', subject, classLevel, body.language || 'en', `Generated lesson plan for ${subject} (${classLevel})`);
       res.json({ plan });
     })
   );
@@ -117,6 +131,7 @@ async function startServer() {
         history: body.history,
       });
 
+      await recordActivity('assistant', 'General', 'All', body.language || 'en', `AI Assistant answered query`);
       res.json({ reply: result.reply, sources: result.sources });
     })
   );
@@ -149,6 +164,7 @@ async function startServer() {
         type: body.type,
       });
 
+      await recordActivity('assessment', subject, classLevel, body.language || 'en', `Generated assessment for ${subject} (${classLevel})`);
       res.json({ assessment });
     })
   );
@@ -179,9 +195,90 @@ async function startServer() {
         classSize: body.classSize,
       });
 
+      await recordActivity('methodology', subject, classLevel, body.language || 'en', `Generated teaching methodology for ${subject} (${classLevel})`);
       res.json({ methodology });
     })
   );
+
+  // Public settings & feedback
+  app.get('/api/settings', async (_req: Request, res: Response) => {
+    try {
+      const settings = await getSiteSettings();
+      const developer = await getDeveloperProfile();
+      res.json({ settings, developer });
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  app.post('/api/feedback', async (req: Request, res: Response) => {
+    try {
+      const { name, email, message } = req.body || {};
+      if (!message || !String(message).trim()) {
+        res.status(400).json({ error: 'Feedback message is required.' });
+        return;
+      }
+      const fb = await submitTeacherFeedback(name || '', email || '', message);
+      await recordActivity('feedback', 'General', 'All', 'en', `Teacher feedback received from ${fb.name}`);
+      res.json({ success: true, feedback: fb });
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // Admin Authentication & Endpoints
+  app.post('/api/admin/auth', (req: Request, res: Response) => {
+    const { password } = req.body || {};
+    if (verifyAdminPassword(password)) {
+      res.json({ success: true, token: process.env.ADMIN_PASSWORD || 'ghad_admin_2026' });
+    } else {
+      res.status(401).json({ error: 'Invalid admin password' });
+    }
+  });
+
+  const requireAdmin = (req: Request, res: Response, next: () => void) => {
+    const authHeader = req.headers.authorization || (req.headers['x-admin-token'] as string);
+    if (verifyAdminPassword(authHeader)) {
+      next();
+    } else {
+      res.status(401).json({ error: 'Unauthorized: Invalid or missing admin token' });
+    }
+  };
+
+  app.get('/api/admin/settings', requireAdmin, async (_req: Request, res: Response) => {
+    res.json(await getSiteSettings());
+  });
+
+  app.post('/api/admin/settings', requireAdmin, async (req: Request, res: Response) => {
+    const updated = await saveSiteSettings(req.body || {});
+    res.json({ success: true, settings: updated });
+  });
+
+  app.get('/api/admin/stats', requireAdmin, async (_req: Request, res: Response) => {
+    res.json(await getAnalyticsStats());
+  });
+
+  app.get('/api/admin/logs', requireAdmin, async (_req: Request, res: Response) => {
+    res.json(await getActivityLogs());
+  });
+
+  app.get('/api/admin/feedback', requireAdmin, async (_req: Request, res: Response) => {
+    res.json(await getTeacherFeedbackList());
+  });
+
+  app.delete('/api/admin/feedback/:id', requireAdmin, async (req: Request, res: Response) => {
+    const success = await deleteTeacherFeedback(req.params.id);
+    res.json({ success });
+  });
+
+  app.get('/api/admin/developer', requireAdmin, async (_req: Request, res: Response) => {
+    res.json(await getDeveloperProfile());
+  });
+
+  app.post('/api/admin/developer', requireAdmin, async (req: Request, res: Response) => {
+    const updated = await saveDeveloperProfile(req.body || {});
+    res.json({ success: true, developer: updated });
+  });
 
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');

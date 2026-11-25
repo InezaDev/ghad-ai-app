@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { User } from 'firebase/auth';
 import {
   ArrowRight,
@@ -22,7 +22,7 @@ import { HeroScene3D } from './HeroScene3D';
 
 const QUICK_CLASSES = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6'];
 const QUICK_SUBJECTS = [
-  'Social & Religious Studies (SRS)',
+  'Social and Religious Education (SRE)',
   'Mathematics',
   'Biology',
   'Physics',
@@ -38,7 +38,7 @@ const QUICK_SUBJECTS = [
 ];
 
 const SUBJECT_SAMPLE_MAP: Record<string, { unit: string; title: string; intro: string; dev: string }> = {
-  'Social & Religious Studies (SRS)': {
+  'Social and Religious Education (SRE)': {
     unit: 'Unit 1 · Equity & Social Cohesion',
     title: 'Equity and Equality in Our Community',
     intro: '1. Greet learners & check inclusive seating. 2. Discuss fairness box scenario.',
@@ -83,8 +83,29 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const year = new Date().getFullYear();
 
   const [quickClass, setQuickClass] = useState('P4');
-  const [quickSubject, setQuickSubject] = useState('Social & Religious Studies (SRS)');
+  const [quickSubject, setQuickSubject] = useState('Social and Religious Education (SRE)');
   const [heroShowcaseTab, setHeroShowcaseTab] = useState<'3d' | 'sheet'>('3d');
+  const [developer, setDeveloper] = useState({
+    name: 'Nkurikiyineza Ghad',
+    title: 'Creator of GHAD AI · Educator & EdTech Developer in Rwanda',
+    school: 'G.S. Saint Etienne',
+    bio: 'GHAD AI is built for Rwandan educators to simplify competence-based curriculum paperwork, lesson planning, quizzes, and teaching guides in English, Kinyarwanda, French, and Kiswahili.',
+    photoUrl: '',
+    phone: '+250 788 123 456',
+    email: 'nkurikiyineza@ghadai.rw',
+    github: '',
+  });
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.developer) {
+          setDeveloper(data.developer);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const samplePreview = SUBJECT_SAMPLE_MAP[quickSubject] || {
     unit: `Unit 1 · ${quickSubject}`,
@@ -575,7 +596,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   {t('tool_ai_d')}
                 </p>
                 <div className="p-3 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--muted)]">
-                  &ldquo;How do I differentiate a P4 SRS lesson for slow learners and visual needs?&rdquo;
+                  &ldquo;How do I differentiate a P4 SRE lesson for slow learners and visual needs?&rdquo;
                 </div>
               </div>
               <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0284C7] dark:text-[#38BDF8]">
@@ -688,6 +709,73 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <ArrowRight className="w-4 h-4 text-[var(--muted)]" />
                 </a>
               ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* About the Developer Section */}
+      <section id="developer" className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+        <div className="holo-glass holo-reticle p-8 sm:p-10 rounded-3xl border border-[#10b981]/30 flex flex-col md:flex-row items-center gap-8 shadow-xl">
+          <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-4 border-[#10b981] bg-gradient-to-br from-[#10b981] to-[#0284c7] text-white flex items-center justify-center font-display font-bold text-3xl shrink-0 shadow-[0_0_24px_-4px_rgba(16,185,129,0.7)]">
+            {developer.photoUrl ? (
+              <img src={developer.photoUrl} alt={developer.name || 'Developer'} className="w-full h-full object-cover" />
+            ) : (
+              <span>{(developer.name || 'NG').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}</span>
+            )}
+          </div>
+          <div className="space-y-3 text-center md:text-left flex-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#10b981]/15 text-[#10b981] text-xs font-semibold">
+              <span>🇷🇼 {developer.school || 'G.S. Saint Etienne'}</span>
+            </div>
+            <h2 className="font-display text-2xl sm:text-3xl font-bold text-[var(--text)]">
+              {developer.name || 'Nkurikiyineza Ghad'}
+            </h2>
+            <p className="text-sm font-semibold text-[#0284c7] dark:text-[#38bdf8]">
+              {developer.title || 'Creator of GHAD AI · Educator & EdTech Developer in Rwanda'}
+            </p>
+            <p className="text-sm text-[var(--muted)] leading-relaxed max-w-2xl">
+              {developer.bio}
+            </p>
+
+            {/* Contact buttons (only shown if filled in) */}
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
+              {developer.phone && (
+                <>
+                  <a
+                    href={`https://wa.me/${developer.phone.replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition shadow-sm"
+                  >
+                    <span>💬 WhatsApp</span>
+                  </a>
+                  <a
+                    href={`tel:${developer.phone}`}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-[var(--text)] text-xs font-semibold hover:border-[#10b981] transition shadow-sm"
+                  >
+                    <span>📞 Call {developer.phone}</span>
+                  </a>
+                </>
+              )}
+              {developer.email && (
+                <a
+                  href={`mailto:${developer.email}`}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-[var(--text)] text-xs font-semibold hover:border-[#10b981] transition shadow-sm"
+                >
+                  <span>✉️ {developer.email}</span>
+                </a>
+              )}
+              {developer.github && (
+                <a
+                  href={developer.github}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-[var(--text)] text-xs font-semibold hover:border-[#10b981] transition shadow-sm"
+                >
+                  <span>🌐 Website / GitHub</span>
+                </a>
+              )}
             </div>
           </div>
         </div>

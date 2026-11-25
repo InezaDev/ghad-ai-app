@@ -42,7 +42,7 @@ const RWANDA_SUBJECTS = [
   'Entrepreneurship',
   'Economics',
   'Science & Elementary Technology (SET)',
-  'Social & Religious Studies (SRS)',
+  'Social and Religious Education (SRE)',
   'Other',
 ];
 
@@ -281,37 +281,32 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
             stageType: 'intro',
             stageName: t('cbc_stage_intro'),
             timingMinutes: intro,
-            teacherActivities: `1. Gusuhuza abanyeshuri, kubara abitabiriye no kureba ko abafite ubumuga bwo kutabona neza bicaye imbere.\n2. Kubaza ibibazo 2 byoroshye bihuje ubuzima busanzwe n'isomo rya "${rwTopic}".\n3. Kwandika umutwe w'isomo ku kibaho no gusobanurira abanyeshuri intego y'isomo.`,
-            learnerActivities: `1. Kwikiriza umwarimu neza no gutegura amakayi n'amakaramu.\n2. Gusubiza ibibazo by'umwarimu bakoresheje ingero zo mu buzima busanzwe.\n3. Gusoma umutwe w'isomo mu ijwi riranguruye no kuwandika mu makayi.`,
+            teacherActivities: `1. Gusuhuza abanyeshuri, kubara abitabiriye no kureba ko abafite ubumuga bwo kutabona neza bicaye imbere.\n2. Kubaza ibibazo 2 byoroshye bihuje ubuzima busanzwe n'isomo rya "${rwTopic}".\n3. Kwandika umutwe w'isomo ku kibaho mu nyandiko isobanutse.\n4. Gusobanurira abanyeshuri intego y'isomo n'ubushobozi bwitezwe muri iri somo.`,
+            learnerActivities: `1. Kwikiriza umwarimu neza no gutegura amakayi n'amakaramu.\n2. Gusubiza ibibazo by'umwarimu bakoresheje ingero zo mu buzima busanzwe.\n3. Gusoma umutwe w'isomo mu ijwi riranguruye no kuwandika mu makayi.\n4. Kugaragaza muri make ibyo biteze kwiga no kunguka muri iri somo.`,
             competencesAndIssues:
               'Itumanaho: abanyeshuri batanga ibitekerezo mu Kinyarwanda cyumvikana.\nUburezi budaheza: imyanya y’imbere n’amakarita yanditse mu nyuguti nini bifasha buri munyeshuri.',
-            observations: 'Kugenzura ko abanyeshuri bose bashishikaye kandi abafite SEN bareba ku kibaho neza.',
           },
           {
             id: `sample_dev_${Date.now()}`,
             stageType: 'development',
             stageName: t('cbc_stage_body'),
             timingMinutes: dev,
-            teacherActivities: `1. Igikorwa mu matsinda: Guha buri tsinda umwitozo kuri "${rwTopic}", ukabasaba gusoma no kwandika ibitekerezo by'ingenzi.\n2. Kumurika no kunoza: Gutumira amatsinda kumurika ibyavuyemo no gukosora imikoreshereze y'amagambo n'amasano mu Kinyarwanda.\n3. Imyitozo iyobowe: Gutanga ibibazo 3 byoroheje mu makayi kandi ugafasha abanyeshuri biga buhoro.`,
-            learnerActivities: `1. Gufatanya mu matsinda basoma kandi baganira kuri "${rwTopic}", bakandika ibisubizo.\n2. Kumurikira bagenzi babo ibyo bagezeho no kwandika incamake yemejwe.\n3. Gukora imyitozo 3 mu makayi yabo hanyuma bakayikosora hamwe n'umwarimu.`,
+            teacherActivities: `1. Igikorwa mu matsinda: Guha buri tsinda ry'abanyeshuri 5 umwandiko n'amakarita y'amagambo kuri "${rwTopic}".\n2. Gusaba abanyeshuri gusoma bucece no gushakira hamwe ibisobanuro by'amagambo mashya.\n3. Gutembera mu ishuri ugenzura ko buri munyeshuri arimo gufashwa kandi atanga igitekerezo.\n4. Gutumira abahagarariye amatsinda kumurika ibyo bagezeho ku kibaho mu buryo busobanutse.\n5. Kunoza no gukosora imyandikire n'imvugo, ugashimangira iby'ingenzi bigize isomo.\n6. Guha abanyeshuri imyitozo 3 yo gusobanura no gusesengura mu makayi yabo.`,
+            learnerActivities: `1. Kwicara mu matsinda y'abanyeshuri 5 no gusoma umwandiko bahawe bucece.\n2. Gusesengura amagambo mashya no kungurana ibitekerezo mu bwubahane.\n3. Kwandika imyanzuro n'ibisubizo by'itsinda ku rupapuro rwo kumurika.\n4. Kumurika ibisubizo by'itsinda imbere y'abandi banyeshuri.\n5. Kwandika incamake yemejwe n'umwarimu mu makayi yabo y'Ikinyarwanda.\n6. Gukora imyitozo 3 y'isuzuma mu makayi ku giti cyabo no gukosora amakosa.`,
             competencesAndIssues:
               'Gutekereza byimbitse n’Ubufatanye: abanyeshuri basesengura umwandiko mu matsinda.\nAmahoro n’indangagaciro n’Uburinganire: abahungu n’abakobwa bahabwa ijambo mu buryo bungana kandi bakumvana mu bwubahane.',
-            observations: 'Gufasha abanyeshuri biga buhoro no guha ikibazo cy’inyongera abarangije mbere.',
           },
           {
             id: `sample_concl_${Date.now()}`,
             stageType: 'conclusion',
             stageName: t('cbc_stage_concl'),
             timingMinutes: concl,
-            teacherActivities: `1. Gufasha abanyeshuri kuvuga mu nteruro ngufi ibyo bize kuri "${rwTopic}".\n2. Kubaza ibibazo 2 by'isuzuma rya nyuma kugira ngo umenye ko intego y'isomo yagezweho.\n3. Gutanga umukoro mugufi wo gukorera mu rugo uvuye mu Gitabo cy'Umunyeshuri.`,
-            learnerActivities: `1. Kuvuga mu magambo yabo amasomo akomeye bakuye muri "${rwTopic}".\n2. Gusubiza ibibazo 2 bya nyuma ku giti cyabo.\n3. Kwandika umukoro wo mu rugo mu makayi.`,
+            teacherActivities: `1. Gufasha abanyeshuri kuvuga mu nteruro ngufi ibyo bize n'isomo rikomeye bakuyemo.\n2. Kubaza ibibazo 2 by'isuzuma rya nyuma kugira ngo umenye ko intego y'isomo yagezweho.\n3. Gutanga inama no gushimira abanyeshuri bose ku bwitange n'ubufatanye bagaragaje.`,
+            learnerActivities: `1. Kuvuga mu magambo yabo amasomo akomeye bakuye muri iri somo.\n2. Gusubiza ibibazo 2 by'isuzuma rya nyuma mu makayi cyangwa mu magambo.\n3. Gutega amatwi inama z'umwarimu no gutunganya ibikoresho by'ishuri.`,
             competencesAndIssues:
-              'Kwiga ubuzima bwose: umukoro wongerera abanyeshuri ubushobozi bwo kwisomera.\nUmuco w’ubuziranenge: kwandika no kuvuga Ikinyarwanda cy’umwimerere kitagira amakosa.',
-            observations: 'Kwandika umubare w’abanyeshuri bashoboye gusubiza neza ibibazo bya nyuma.',
+              'Kwiga ubuzima bwose: abanyeshuri basobanukirwa agaciro ko kwisomera umwandiko.\nUmuco w’ubuziranenge: kwandika no kuvuga Ikinyarwanda cy’umwimerere kitagira amakosa.',
           },
         ],
-        assessmentCriteria: `Kugenzura ko abanyeshuri bashobora gusoma no gusubiza neza ibibazo 2 kuri "${rwTopic}" ku kigero cya 80%.`,
-        homework: `Gusubiza ibibazo 2 bigufi kuri "${rwTopic}" biri mu Gitabo cy'Umunyeshuri cya REB.`,
         teacherSelfEvaluation: `Isomo rya "${rwTopic}" ryatanzwe mu minota ${total}. Abanyeshuri bagera kuri ___% bageze ku ntego y'isomo; abanyeshuri ___ bakeneye ubufasha bwihariye bazahabwa imyitozo y'inyongera.`,
       };
 
@@ -320,41 +315,42 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
       return;
     }
 
-    const isSrsEquity =
+    const isSreEquity =
+      chosenSubject === 'Social and Religious Education (SRE)' ||
       chosenSubject === 'Social & Religious Studies (SRS)' ||
       /\bequity\b|\bequality\b/i.test(rawTopic);
 
     const isDefaultMathSample =
       chosenSubject === 'Mathematics' && (!rawTopic || /\bfraction/i.test(rawTopic));
 
-    if (isSrsEquity) {
-      const srsTopic = rawTopic || 'Equity and Equality';
-      const srsUnit = unitTitle.trim() || 'Human Rights, Equity, and Social Cohesion';
-      setSubject('Social & Religious Studies (SRS)');
+    if (isSreEquity) {
+      const sreTopic = rawTopic || 'Equity and Equality';
+      const sreUnit = unitTitle.trim() || 'Human Rights, Equity, and Social Cohesion';
+      setSubject('Social and Religious Education (SRE)');
       setCustomSubject('');
-      setTopic(srsTopic);
-      setUnitTitle(srsUnit);
+      setTopic(sreTopic);
+      setUnitTitle(sreUnit);
 
-      const srsPlan: LessonPlanData = {
+      const srePlan: LessonPlanData = {
         schoolName: schoolName.trim() || profile.schoolName || 'GS Kigali',
         teacherName: teacherName.trim() || profile.teacherName || 'Jean Bosco Mugisha',
         term: localizedTerm,
         date: activeDate,
-        subject: 'Social & Religious Studies (SRS)',
+        subject: 'Social and Religious Education (SRE)',
         classLevel: chosenClass,
         unitNo: unitNo || '1',
         lessonNo: lessonNo || '1 of 4',
         durationMinutes: total,
         classSize: activeSize,
         sen: activeSen,
-        unitTitle: srsUnit,
-        keyUnitCompetence: `To be able to explain ${srsTopic.toLowerCase()}, value fairness in the community, and treat all people with respect.`,
-        lessonTitle: srsTopic,
-        instructionalObjective: `Using real-life picture cards in small groups, ${chosenClass} students will be able to tell the difference between equity and equality and give at least 3 ways to practice fairness at school and at home.`,
+        unitTitle: sreUnit,
+        keyUnitCompetence: `To be able to explain ${sreTopic.toLowerCase()}, value fairness in the community, and treat all people with respect.`,
+        lessonTitle: sreTopic,
+        instructionalObjective: `Using real-life picture cards in small groups, ${chosenClass} students will be able to explain the difference between equity and equality and give at least 3 ways to practice fairness at school and at home.`,
         planLocation: 'Inside the classroom — students sit in mixed-ability groups of 5.',
         learningMaterials:
-          'Picture cards, chalkboard, chalk, large-print word cards (for visual support), REB Social & Religious Studies Learner’s Book.',
-        references: `REB (2020) Social & Religious Studies for Rwandan Primary Schools ${chosenClass} Teacher’s Guide & Learner’s Book, Unit ${unitNo || '1'}.`,
+          'Picture cards, chalkboard, chalk, large-print word cards (for visual support), REB Social and Religious Education Learner’s Book.',
+        references: `REB (2020) Social and Religious Education for Rwandan Primary Schools ${chosenClass} Teacher’s Guide & Learner’s Book, Unit ${unitNo || '1'}.`,
         activityOverview: `Students look at simple pictures, talk in pairs, and act out short role-plays to understand the difference between giving everyone the exact same thing (equality) and giving each person what they need to succeed (equity).`,
         stages: [
           {
@@ -363,12 +359,11 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
             stageName: t('cbc_stage_intro'),
             timingMinutes: intro,
             teacherActivities:
-              '1. Greet students warmly, check attendance, and seat students with low vision near the chalkboard.\n2. Show a simple picture (three children of different heights looking over a fence using boxes) and ask who needs extra boxes to see.\n3. Connect their ideas to children’s rights and write the lesson title: Equity and Equality.',
+              '1. Greet students warmly, check attendance, and seat students who need visual support near the chalkboard.\n2. Show a picture of children of different heights trying to watch a match over a fence using wooden boxes.\n3. Ask students: "If we give each child one box, can the shortest child see over the fence? What is fair?"\n4. Connect their ideas to fairness and write the lesson title: Equity and Equality.',
             learnerActivities:
-              '1. Greet the teacher and settle into seats.\n2. Look at the picture, talk in pairs about which box setup is fair, and share answers.\n3. Read the lesson title aloud and write it in notebooks.',
+              '1. Greet the teacher and settle into mixed-ability groups of 5.\n2. Observe the picture card carefully and think about what each child needs.\n3. Discuss in pairs which box arrangement is fair and share responses with the whole class.\n4. Read the lesson title aloud together and write it in notebooks.',
             competencesAndIssues:
               'Communication: students explain their ideas in simple, clear words.\nInclusive education: students discuss why some learners need different support to succeed.',
-            observations: 'Confirm students with low vision can see picture cards clearly.',
           },
           {
             id: `sample_dev_${Date.now()}`,
@@ -376,12 +371,11 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
             stageName: t('cbc_stage_body'),
             timingMinutes: dev,
             teacherActivities:
-              '1. Group Task: Give each group two short story cards—one showing equal treatment without checking needs, and one showing fair help based on need—and ask them to compare.\n2. Share and Explain: Ask group leaders to share answers, write simple definitions of equality and equity on the board, and clarify mistakes.\n3. Role-Play Practice: Give each group a school example (sharing books, helping a classmate with a disability) to act out while helping slow learners.',
+              '1. Distribute two case study cards to each group: Card A shows giving the exact same book to every student, while Card B shows providing large-print to a student with low vision.\n2. Guide each group to examine both cards and answer: "Which card shows equal treatment? Which card shows fair support (equity)?"\n3. Move from group to group, prompting students to explain their reasoning and supporting struggling learners.\n4. Invite group leaders to share findings and write the two key definitions on the chalkboard.\n5. Clarify that equality means giving everyone the same, while equity means giving each person what they need to succeed.\n6. Assign each group a practical school scenario (sharing library books, taking turns cleaning, supporting an injured classmate) to role-play.\n7. Observe student role-plays, ensuring boys and girls participate equally and treat each other respectfully.',
             learnerActivities:
-              '1. Read the story cards together, discuss which case is equality and which is equity, and write group notes.\n2. Present group answers to the class and copy the clear definitions into notebooks.\n3. Perform short 1-minute role-plays showing fairness at school.',
+              '1. Read and examine Card A and Card B together in small groups of 5.\n2. Discuss why giving everyone the exact same resource is not always fair when learners have different needs.\n3. Record group ideas and arguments in exercise books.\n4. Present group findings to the class with concrete reasons.\n5. Copy the confirmed definitions of equality and equity into notebooks.\n6. Practice short 1-minute role-plays demonstrating fairness in daily school situations.\n7. Provide respectful, constructive feedback on other groups’ role-plays.',
             competencesAndIssues:
               'Critical thinking and Cooperation: students compare real-life cases together.\nGender and Peace and values education: boys and girls lead equally and show respect.',
-            observations: 'Support slow learners with real school examples; challenge fast groups to suggest a 2nd role-play.',
           },
           {
             id: `sample_concl_${Date.now()}`,
@@ -389,23 +383,18 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
             stageName: t('cbc_stage_concl'),
             timingMinutes: concl,
             teacherActivities:
-              '1. Help students sum up the difference between equity and equality in their own words.\n2. Ask 3 quick exit questions to check understanding.\n3. Give short homework: list 2 ways to practice equity at home or in the village.',
+              '1. Guide learners to synthesize the main difference between equity and equality in simple words.\n2. Ask 2 quick oral exit check questions to verify understanding of fairness in school.\n3. Provide positive summary feedback celebrating inclusive class teamwork.',
             learnerActivities:
-              '1. Explain one clear difference between equity and equality with a daily example.\n2. Answer the 3 exit questions in exercise books.\n3. Copy the homework neatly.',
+              '1. State one clear real-life difference between equity and equality in their own words.\n2. Answer the exit check questions thoughtfully.\n3. State one concrete way they will practice fairness with their peers today.',
             competencesAndIssues:
               'Lifelong learning: students connect fairness lessons to life outside school.\nPeace and values education: students practice kindness and fairness daily.',
-            observations: 'Record any learners needing extra clarification next lesson.',
           },
         ],
-        assessmentCriteria:
-          'Learners clearly distinguish equity from equality and give at least 3 practical examples of fairness (at least 80% mastery on exit questions).',
-        homework:
-          'Write 2 ways you can practice equity at home or in your community and share one example tomorrow.',
         teacherSelfEvaluation:
           `Lesson delivered in ${total} minutes using picture cards and role-play. About ___% of students correctly explained the difference between equity and equality; extra help will be given to the ___ students who need more examples.`,
       };
 
-      setPlanFromSelf(srsPlan);
+      setPlanFromSelf(srePlan);
       onToast(t('toast_sample_loaded'), 'success');
       return;
     }
@@ -450,12 +439,11 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
             stageName: t('cbc_stage_intro'),
             timingMinutes: intro,
             teacherActivities:
-              '1. Greet students, check attendance, and seat students who need clear vision in the front row.\n2. Draw a circle cut into 4 equal parts on the board, shade 1 part, and ask students to name the fraction.\n3. Connect this to sharing an orange at home and write the lesson title on the board.',
+              '1. Greet students, check attendance, and seat students who need clear vision in the front row.\n2. Draw a circle cut into 4 equal parts on the board, shade 1 part, and ask students to name the fraction.\n3. Connect this to sharing an orange at home and write the lesson title on the board: Addition of Fractions with the Same Denominator.\n4. Explain today’s lesson objective: adding fractions with the same bottom number without adding the denominators.',
             learnerActivities:
-              '1. Greet the teacher and take out notebooks and pens.\n2. Name the shaded fraction (1/4) and share everyday examples of equal sharing.\n3. Read and copy the lesson title into notebooks.',
+              '1. Greet the teacher and take out notebooks and pens.\n2. Name the shaded fraction (1/4) and share everyday examples of equal sharing.\n3. Read and copy the lesson title into notebooks.\n4. State the main goal they want to accomplish during the lesson.',
             competencesAndIssues:
               'Communication: students explain what they remember clearly.\nPeace and values education: students take turns and listen politely.',
-            observations: 'Ensure front-row learners can read the shaded fraction diagram clearly.',
           },
           {
             id: `sample_dev_${Date.now()}`,
@@ -463,12 +451,11 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
             stageName: t('cbc_stage_body'),
             timingMinutes: dev,
             teacherActivities:
-              '1. Group Discovery: Give each group a paper strip divided into 4 equal parts. Ask them to color 1/4 blue and 2/4 green, then count all colored parts.\n2. Share and Explain: Ask 2 groups to show their work and explain the simple rule: add the top numbers (numerators) and keep the bottom number (denominator) the same.\n3. Guided Practice: Write 3 questions (2/5 + 1/5, 3/8 + 4/8, 1/6 + 4/6) on the board and walk around to help slow learners.',
+              '1. Group Discovery: Give each group a paper strip divided into 4 equal parts. Ask them to color 1/4 blue and 2/4 green, then count all colored parts.\n2. Guide learners to observe what happened to the denominator (bottom number) versus numerator (top number).\n3. Ask 2 groups to present their strips on the chalkboard and share what they notice.\n4. Explain and write the clear mathematical rule: add the top numbers (numerators) and keep the bottom number (denominator) the same.\n5. Write 3 practice questions (2/5 + 1/5, 3/8 + 4/8, 1/6 + 4/6) on the board and guide paired practice.\n6. Walk around the room providing individual support to struggling learners and giving a bonus question (3/10 + 4/10 + 1/10) to fast finishers.',
             learnerActivities:
-              '1. Fold and color paper strips in groups, count 1/4 + 2/4 = 3/4, and talk about why the bottom number stays 4.\n2. Share answers with the class and write the addition rule in notebooks.\n3. Solve the 3 practice questions in pairs and check answers on the board.',
+              '1. Fold and color paper strips in groups, count 1/4 + 2/4 = 3/4, and discuss why the strip still has 4 parts in total.\n2. Compare findings with neighboring peers and formulate the addition pattern.\n3. Present group solutions on the board clearly explaining the steps.\n4. Copy the addition rule and diagrams neatly into mathematics exercise books.\n5. Solve the 3 practice questions in pairs, taking turns calculating and verifying answers.\n6. Check final solutions against the chalkboard and explain any errors found.',
             competencesAndIssues:
               'Cooperation and Critical thinking: students work together and notice why the bottom number does not change.\nGender and Inclusive education: boys and girls lead groups equally; large-print strips help everyone follow.',
-            observations: 'Remind learners NOT to add denominators; give fast finishers 3/10 + 4/10 + 1/10.',
           },
           {
             id: `sample_concl_${Date.now()}`,
@@ -476,18 +463,13 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
             stageName: t('cbc_stage_concl'),
             timingMinutes: concl,
             teacherActivities:
-              '1. Ask students to state the rule for adding fractions with the same denominator in simple words.\n2. Give a 2-question exit check (3/7 + 2/7 = ?, 1/9 + 5/9 = ?) and check answers together.\n3. Give 3 short homework questions from the REB Learner’s Book.',
+              '1. Ask students to state the rule for adding fractions with the same denominator in simple words.\n2. Give a 2-question exit check (3/7 + 2/7 = ?, 1/9 + 5/9 = ?) and check answers together.\n3. Summarize key takeaways, praise active participation, and remind learners not to add denominators.',
             learnerActivities:
-              '1. Say the rule in their own words.\n2. Solve the 2 exit questions on their own and check solutions.\n3. Copy the homework into notebooks.',
+              '1. Say the rule aloud in their own words: add numerators, keep denominator unchanged.\n2. Solve the 2 exit questions independently in exercise books.\n3. Verify results and note personal areas for extra practice.',
             competencesAndIssues:
-              'Standardization culture: students write fractions neatly and correctly.\nLifelong learning: homework builds strong study habits.',
-            observations: 'Check exit books immediately to identify learners needing remedial support.',
+              'Standardization culture: students write fractions neatly and correctly.\nLifelong learning: students connect fractions to daily household measurements.',
           },
         ],
-        assessmentCriteria:
-          'Learners accurately add like-denominator fractions using folded strips and solve at least 4 of 5 practice/exit items.',
-        homework:
-          'Solve 3 like-denominator fraction additions in the REB Mathematics Learner’s Book.',
         teacherSelfEvaluation: `Lesson taught in ${total} minutes. About ___% of students got both exit questions right. Extra practice will be given to the ___ students who added the bottom numbers by mistake.`,
       };
 
@@ -515,9 +497,9 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
           devComp:
             'Critical thinking and Problem solving: students solve practical everyday problems step by step.\nFinancial education & Gender: boys and girls share leadership equally and link ideas to wise money use.',
           conclComp:
-            'Standardization culture: students check accuracy in their answers.\nLifelong learning: homework builds confidence for daily life.',
+            'Standardization culture: students check accuracy in their answers.\nLifelong learning: students build confidence for daily life.',
         }
-      : /hist|srs|relig|peace|right|genocide|citizen/.test(subjLower)
+      : /hist|sre|srs|relig|peace|right|genocide|citizen/.test(subjLower)
       ? {
           devComp:
             'Critical thinking and Cooperation: students discuss community stories respectfully in groups.\nPeace and values education & Gender: students value fairness, unity, and equal participation.',
@@ -528,7 +510,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
           devComp:
             'Creativity and innovation & Cooperation: students share original examples and work well in groups.\nGender & Peace and values education: boys and girls take equal turns speaking and listening.',
           conclComp:
-            'Communication: students summarize key points clearly.\nLifelong learning: homework helps students practice on their own.',
+            'Communication: students summarize key points clearly.\nLifelong learning: students practice skills independently.',
         };
 
     const dynamicPlan: LessonPlanData = {
@@ -557,35 +539,30 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
           stageType: 'intro',
           stageName: t('cbc_stage_intro'),
           timingMinutes: intro,
-          teacherActivities: `1. Greet students, check attendance, and confirm front-row seating for students who need extra support.\n2. Ask 2 simple questions linking everyday life to ${dynamicTopic}.\n3. Write the lesson title "${dynamicTopic}" on the board and share today’s goal.`,
-          learnerActivities: `1. Greet the teacher and prepare notebooks and pens.\n2. Answer review questions using everyday examples connected to ${dynamicTopic}.\n3. Read and copy the lesson title into notebooks.`,
+          teacherActivities: `1. Greet students warmly, check attendance, and ensure learners with special educational needs sit in front.\n2. Ask 2 diagnostic questions linking everyday life to ${dynamicTopic}.\n3. Write the lesson title "${dynamicTopic}" clearly on the chalkboard.\n4. Share today’s competence goal so students know what they will achieve.`,
+          learnerActivities: `1. Greet the teacher and organize learning materials at their desks.\n2. Answer review questions using everyday examples connected to ${dynamicTopic}.\n3. Read and copy the lesson title into notebooks.\n4. Restate today’s lesson objective in their own words.`,
           competencesAndIssues:
             'Communication: students share ideas in simple, clear words.\nInclusive education: good seating and clear speech help every student participate.',
-          observations: 'Verify all learners (including SEN) can see and hear clearly.',
         },
         {
           id: `sample_dev_${Date.now()}`,
           stageType: 'development',
           stageName: t('cbc_stage_body'),
           timingMinutes: dev,
-          teacherActivities: `1. Group Task: Give mixed-ability groups a clear hands-on task on ${dynamicTopic} and guide their discussion.\n2. Share and Explain: Invite groups to share answers, clear up mistakes, and write simple key points on the board.\n3. Guided Practice: Give easy and medium practice tasks on ${dynamicTopic} while helping slow learners.`,
-          learnerActivities: `1. Work together in groups on the task and write down findings.\n2. Present group work to the class and copy the clear summary into notebooks.\n3. Do the practice questions in pairs and check answers together.`,
+          teacherActivities: `1. Group Task: Give mixed-ability groups of 5 a structured task on ${dynamicTopic} with concrete examples.\n2. Circulate among groups to guide discussions, prompt critical thinking, and support struggling learners.\n3. Invite group representatives to present findings and record key observations on the board.\n4. Synthesize class contributions and clearly explain core concepts of ${dynamicTopic}.\n5. Provide 2–3 guided practice questions for students to solve in pairs.\n6. Review paired responses on the board, address common misconceptions, and provide positive reinforcement.`,
+          learnerActivities: `1. Work collaboratively in groups of 5 on the assigned task and record observations.\n2. Discuss key questions actively, ensuring all group members contribute.\n3. Present group findings to the class and answer questions from peers.\n4. Copy the confirmed summary of ${dynamicTopic} into notebooks.\n5. Solve the guided practice questions in pairs, verifying each step together.\n6. Self-correct their work based on the class review and teacher feedback.`,
           competencesAndIssues: topicCompetencePair.devComp,
-          observations: 'Guide struggling groups with simpler hints; offer a stretch prompt to early finishers.',
         },
         {
           id: `sample_concl_${Date.now()}`,
           stageType: 'conclusion',
           stageName: t('cbc_stage_concl'),
           timingMinutes: concl,
-          teacherActivities: `1. Help students sum up the main points of ${dynamicTopic} in simple words.\n2. Ask 2 or 3 quick exit questions to check understanding.\n3. Give short homework from the REB ${chosenSubject} Learner’s Book.`,
-          learnerActivities: `1. State the main takeaways of ${dynamicTopic} in their own words.\n2. Answer the exit questions on their own and check solutions.\n3. Copy the homework into notebooks.`,
+          teacherActivities: `1. Guide students to summarize the 3 main takeaways of ${dynamicTopic}.\n2. Ask 2 quick exit check questions to evaluate individual mastery of the lesson objective.\n3. Offer constructive feedback on group participation and lesson engagement.`,
+          learnerActivities: `1. State the main takeaways of ${dynamicTopic} in their own words.\n2. Answer the exit check questions independently in exercise books.\n3. Reflect on how they will use the lesson concepts in daily life.`,
           competencesAndIssues: topicCompetencePair.conclComp,
-          observations: 'Note exit-check gaps to address at the start of the next lesson.',
         },
       ],
-      assessmentCriteria: `Check learners' group outputs and 2–3 exit questions on ${dynamicTopic} (at least 80% accuracy).`,
-      homework: `Answer 2 short questions on ${dynamicTopic} from the REB ${chosenSubject} Learner’s Book.`,
       teacherSelfEvaluation: `Lesson on ${dynamicTopic} (${chosenClass} ${chosenSubject}) was taught in ${total} minutes. About ___% of students met the lesson goal; extra support will be given to the ___ students needing more practice.`,
     };
 
@@ -627,7 +604,6 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
           teacherActivities: '1. \n2. \n3. ',
           learnerActivities: '1. \n2. \n3. ',
           competencesAndIssues: '',
-          observations: '',
         },
         {
           id: 'blank_dev',
@@ -637,7 +613,6 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
           teacherActivities: '1. \n2. \n3. ',
           learnerActivities: '1. \n2. \n3. ',
           competencesAndIssues: '',
-          observations: '',
         },
         {
           id: 'blank_concl',
@@ -647,11 +622,8 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
           teacherActivities: '1. \n2. \n3. ',
           learnerActivities: '1. \n2. \n3. ',
           competencesAndIssues: '',
-          observations: '',
         },
       ],
-      assessmentCriteria: '',
-      homework: '',
       teacherSelfEvaluation: '',
     };
     setPlanFromSelf(blank);
@@ -773,8 +745,6 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
         !activePlan.learningMaterials.trim() ||
         !activePlan.references.trim() ||
         !activePlan.activityOverview.trim() ||
-        !(activePlan.assessmentCriteria || '').trim() ||
-        !(activePlan.homework || '').trim() ||
         !activePlan.teacherSelfEvaluation.trim() ||
         activePlan.stages.some(
           (st) =>

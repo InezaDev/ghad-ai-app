@@ -22,6 +22,7 @@ import {
   assessmentToPlainText,
   assessmentToWordHtml,
   downloadWordDoc,
+  formatQuestionMarks,
   isEmbeddedSandbox,
   printOrDownloadHtml,
 } from '../utils/export';
@@ -532,7 +533,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                         </span>
                       )}
                       <span className="font-mono-tabular text-xs font-semibold text-[var(--muted)]">
-                        [{q.marks} {t('assess_pts')}]
+                        ({formatQuestionMarks(q.marks, lang)})
                       </span>
                     </div>
                   </div>

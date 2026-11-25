@@ -84,6 +84,7 @@ import { AssessmentPrefill, AssessmentView } from './components/AssessmentView';
 import { MethodologyPrefill, MethodologyView } from './components/MethodologyView';
 import { LibraryView } from './components/LibraryView';
 import { ResourcesView, SettingsView } from './components/ResourcesAndSettingsViews';
+import { AdminDashboardView } from './components/AdminDashboardView';
 
 export default function App() {
   const [inWorkspace, setInWorkspace] = useState(false);
@@ -1045,7 +1046,16 @@ export default function App() {
                 onSaveProfile={handleProfileSave}
                 onImportBackup={handleImportBackup}
                 onClearAll={handleClearAll}
+                onOpenAdmin={() => switchView('admin')}
                 onToast={showToast}
+              />
+            )}
+
+            {activeView === 'admin' && (
+              <AdminDashboardView
+                lang={lang}
+                onToast={showToast}
+                onBack={() => switchView('dashboard')}
               />
             )}
           </main>
