@@ -1,16 +1,20 @@
+export function extractAuthErrorCode(err: unknown): string {
+  return (err as { code?: string })?.code || '';
+}
+
 export function mapAuthError(
   err: unknown,
   t: (k: string) => string,
   currentHost?: string
 ): string {
-  const code = (err as { code?: string })?.code || '';
+  const code = extractAuthErrorCode(err);
   switch (code) {
     case 'auth/unauthorized-domain': {
       const host =
         currentHost ||
         (typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : '');
       const base = t('auth_err_unauthorized_domain');
-      return host ? base.replace('{domain}', host) : base.replace(' ({domain})', '');
+      return host ? base.replace('{domain}', host) : base.replace('"{domain}"', 'this domain');
     }
     case 'auth/operation-not-allowed':
       return t('auth_err_op_not_allowed');

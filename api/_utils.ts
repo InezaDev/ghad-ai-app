@@ -41,6 +41,19 @@ export function parseRequestBody(rawBody: unknown): ParsedBodyResult | ParsedBod
 export interface ApiRequest {
   method?: string;
   body?: unknown;
+  headers?: Record<string, string | string[] | undefined>;
+  query?: Record<string, unknown>;
+}
+
+export function getHeader(req: ApiRequest, name: string): string | undefined {
+  if (!req.headers) return undefined;
+  const target = name.toLowerCase();
+  for (const [k, v] of Object.entries(req.headers)) {
+    if (k.toLowerCase() === target) {
+      return Array.isArray(v) ? v[0] : v;
+    }
+  }
+  return undefined;
 }
 
 export interface ApiResponse {

@@ -18,6 +18,7 @@ import {
   LogIn,
   LogOut,
   MailWarning,
+  Megaphone,
   Menu,
   MessageSquare,
   Settings,
@@ -40,12 +41,14 @@ import { AuthModal } from './components/AuthModal';
 import {
   AppBackup,
   ChatThread,
+  DeveloperProfile,
   GraphicsQuality,
   Lang,
   LessonPlanData,
   SavedAssessment,
   SavedMethodology,
   SavedPlan,
+  SiteSettings,
   TeacherProfile,
   ThemeMode,
   ToastItem,
@@ -85,10 +88,12 @@ import { MethodologyPrefill, MethodologyView } from './components/MethodologyVie
 import { LibraryView } from './components/LibraryView';
 import { ResourcesView, SettingsView } from './components/ResourcesAndSettingsViews';
 import { AdminDashboardView } from './components/AdminDashboardView';
+import { MaintenanceNotice } from './components/MaintenanceNotice';
 
 export default function App() {
-  const [inWorkspace, setInWorkspace] = useState(false);
-  const [activeView, setActiveView] = useState<ViewName>('dashboard');
+  const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/admin';
+  const [inWorkspace, setInWorkspace] = useState(isAdminRoute);
+  const [activeView, setActiveView] = useState<ViewName>(isAdminRoute ? 'admin' : 'dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [lang, setLangState] = useState<Lang>(() => loadLang());
@@ -127,11 +132,72 @@ export default function App() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [authReady, setAuthReady] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [verificationNonce, setVerificationNonce] = useState(0);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'register'>('signin');
   const cloudSeededRef = useRef<string | null>(null);
 
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>({
+    bannerText: '',
+    bannerActive: false,
+    maintenanceMode: false,
+    toolLesson: true,
+    toolAssistant: true,
+    toolAssessment: true,
+    toolMethodology: true,
+  });
+  const [developerProfile, setDeveloperProfile] = useState<DeveloperProfile>({
+    name: 'Nkurikiyineza Ghad',
+    title: 'Student-Teacher | Social Studies Education | Creator of GHAD AI',
+    school: 'TTC Muhanga',
+    bio: 'I am a passionate Year 3 student at TTC Muhanga, pursuing Social Studies Education (SSE), with a strong interest in teaching, educational innovation, and technology.\n\nAs the creator of GHAD AI, I am committed to transforming education through digital solutions that help teachers simplify lesson planning, competence-based curriculum documentation, quizzes, and teaching resources in English, Kinyarwanda, French, and Kiswahili.\n\nMy interests include curriculum development, learner-centred teaching, educational research, assessment, and digital learning.\n\nI am open to job opportunities, internships, educational projects, volunteering, and professional collaborations where I can apply my skills, gain experience, and make a positive contribution.\n\nMy mission: Empowering educators, inspiring learners, and transforming education through innovation.',
+    photoUrl: '',
+    phone: '+250 783262573',
+    email: 'inezaghad250@gmail.com',
+    github: '',
+  });
+  const [wsBannerDismissed, setWsBannerDismissed] = useState(false);
+
   const t = useCallback((k: string) => translate(lang, k), [lang]);
+
+  const refreshSiteConfig = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.settings) {
+        setSiteSettings(data.settings);
+      }
+      if (data?.developer) {
+        setDeveloperProfile(data.developer);
+      }
+    } catch {
+      // Non-fatal fallback to defaults
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshSiteConfig();
+    const onFocus = () => {
+      void refreshSiteConfig();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [refreshSiteConfig]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const onAdminPath = window.location.pathname.replace(/\/+$/, '') === '/admin';
+      if (onAdminPath) {
+        setInWorkspace(true);
+        setActiveView('admin');
+      } else {
+        setActiveView((prev) => (prev === 'admin' ? 'dashboard' : prev));
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   // Apply theme (auto / light / dark) to <html>
   useEffect(() => {
@@ -322,7 +388,7 @@ export default function App() {
     }
 
     return () => unsub();
-  }, [authReady, currentUser, currentUser?.emailVerified]);
+  }, [authReady, currentUser, currentUser?.emailVerified, verificationNonce]);
 
   const openAuth = (mode: 'signin' | 'register' = 'signin') => {
     setAuthModalMode(mode);
@@ -354,7 +420,8 @@ export default function App() {
       await currentUser.reload();
       await currentUser.getIdToken(true);
       if (auth.currentUser?.emailVerified) {
-        setCurrentUser({ ...auth.currentUser } as User);
+        setCurrentUser(auth.currentUser);
+        setVerificationNonce((n) => n + 1);
         showToast(t('toast_verified_ok'), 'success');
       } else {
         showToast(t('toast_verify_pending'), 'warning');
@@ -394,14 +461,46 @@ export default function App() {
     }
   };
 
+  const isToolEnabled = useCallback(
+    (view: ViewName): boolean => {
+      if (view === 'lesson') return siteSettings.toolLesson;
+      if (view === 'assistant') return siteSettings.toolAssistant;
+      if (view === 'assessment') return siteSettings.toolAssessment;
+      if (view === 'methodology') return siteSettings.toolMethodology;
+      return true;
+    },
+    [siteSettings]
+  );
+
+  const syncAdminUrl = (nextView: ViewName, workspaceOpen: boolean) => {
+    if (typeof window === 'undefined') return;
+    const currentPath = window.location.pathname.replace(/\/+$/, '');
+    if (workspaceOpen && nextView === 'admin') {
+      if (currentPath !== '/admin') {
+        window.history.pushState({ view: 'admin' }, '', '/admin');
+      }
+    } else if (currentPath === '/admin') {
+      window.history.pushState({}, '', '/');
+    }
+  };
+
   const launchWorkspace = (view: ViewName) => {
+    if (!isToolEnabled(view)) {
+      showToast('This tool is currently paused by the administrator.', 'warning');
+      return;
+    }
     setInWorkspace(true);
     setActiveView(view);
     setSidebarOpen(false);
+    syncAdminUrl(view, true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleQuickLaunchLesson = (prefill: { subject: string; classLevel: string }) => {
+    if (!isToolEnabled('lesson')) {
+      showToast('Lesson Planner is currently paused by the administrator.', 'warning');
+      return;
+    }
     setActivePlan(null);
     setEditingSavedId(null);
     setLastSavedPlanJson(null);
@@ -410,8 +509,13 @@ export default function App() {
   };
 
   const switchView = (view: ViewName) => {
+    if (!isToolEnabled(view)) {
+      showToast('This tool is currently paused by the administrator.', 'warning');
+      return;
+    }
     setActiveView(view);
     setSidebarOpen(false);
+    syncAdminUrl(view, true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -666,11 +770,14 @@ export default function App() {
           lang={lang}
           graphicsQuality={graphicsQuality}
           user={currentUser}
+          siteSettings={siteSettings}
+          developer={developerProfile}
           onChangeLang={handleLangChange}
           onLaunch={launchWorkspace}
           onQuickLaunchLesson={handleQuickLaunchLesson}
           onOpenAuth={openAuth}
           onSignOut={handleSignOut}
+          onToast={showToast}
         />
       ) : (
         <div id="workspaceApp" className="relative z-10 min-h-screen flex bg-transparent text-[var(--text)]">
@@ -710,7 +817,10 @@ export default function App() {
               <button
                 id="backToHomeBtn"
                 type="button"
-                onClick={() => setInWorkspace(false)}
+                onClick={() => {
+                  setInWorkspace(false);
+                  syncAdminUrl('dashboard', false);
+                }}
                 className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[#15803D] transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
@@ -721,21 +831,29 @@ export default function App() {
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeView === item.view;
+                  const enabled = isToolEnabled(item.view);
                   return (
                     <button
                       key={item.view}
                       type="button"
                       onClick={() => switchView(item.view)}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium rounded-xl transition-colors cursor-pointer whitespace-nowrap ${
+                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium rounded-xl transition-colors cursor-pointer whitespace-nowrap ${
                         isActive
                           ? 'bg-[#15803D] text-white shadow-xs'
-                          : 'text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--text)]'
+                          : enabled
+                          ? 'text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--text)]'
+                          : 'text-[var(--muted)] opacity-55 hover:bg-[var(--surface-subtle)]'
                       }`}
                     >
-                      <Icon className="w-4 h-4 shrink-0" />
-                      <span data-i18n={item.key} className="font-display tracking-[0.03em] truncate">
-                        {t(item.key)}
+                      <span className="flex items-center gap-2.5 min-w-0">
+                        <Icon className="w-4 h-4 shrink-0" />
+                        <span data-i18n={item.key} className="font-display tracking-[0.03em] truncate">
+                          {t(item.key)}
+                        </span>
                       </span>
+                      {!enabled && (
+                        <span className="text-[10px] font-semibold text-amber-500 shrink-0">{t('paused_short')}</span>
+                      )}
                     </button>
                   );
                 })}
@@ -847,6 +965,39 @@ export default function App() {
 
           {/* Main Workspace Viewport */}
           <main className="workspace-main flex-1 min-w-0 px-4 sm:px-8 pt-16 lg:pt-8 pb-12 max-w-[1440px] w-full mx-auto">
+            {siteSettings.bannerActive && siteSettings.bannerText.trim() && !wsBannerDismissed && (
+              <div className="no-print mb-4 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#15803D]/15 via-[#059669]/15 to-[#0284C7]/15 border border-[#10b981]/35 text-xs sm:text-sm text-[var(--text)] flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Megaphone className="w-4 h-4 shrink-0 text-[#10b981]" />
+                  <span>{siteSettings.bannerText}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWsBannerDismissed(true)}
+                  aria-label="Dismiss announcement"
+                  className="p-1 rounded hover:bg-[var(--surface-subtle)] text-[var(--muted)] hover:text-[var(--text)] shrink-0 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {siteSettings.maintenanceMode &&
+              activeView !== 'admin' &&
+              activeView !== 'lesson' &&
+              activeView !== 'assistant' &&
+              activeView !== 'assessment' &&
+              activeView !== 'methodology' && (
+                <MaintenanceNotice
+                  variant="workspace"
+                  onReturnHome={() => {
+                    setInWorkspace(false);
+                    syncAdminUrl('dashboard', false);
+                  }}
+                  className="mb-5"
+                />
+              )}
+
             {activeView === 'dashboard' && (
               <section id="view-dashboard" className="view-animate space-y-6">
                 <div>
@@ -945,15 +1096,23 @@ export default function App() {
                     },
                   ].map((card) => {
                     const Icon = card.icon;
+                    const enabled = isToolEnabled(card.view);
                     return (
                       <button
                         key={card.view}
                         type="button"
                         onClick={() => switchView(card.view)}
-                        className="holo-glass holo-reticle card-3d-tilt text-left p-5 rounded-2xl border border-[#38bdf8]/25 hover:border-[#10b981] flex flex-col gap-3 cursor-pointer"
+                        className={`holo-glass holo-reticle card-3d-tilt text-left p-5 rounded-2xl border border-[#38bdf8]/25 hover:border-[#10b981] flex flex-col gap-3 cursor-pointer ${
+                          !enabled ? 'opacity-60' : ''
+                        }`}
                       >
-                        <div className={`w-10 h-10 rounded-xl grid place-items-center ${card.iconStyle}`}>
-                          <Icon className="w-5 h-5" />
+                        <div className="flex items-center justify-between gap-2 w-full">
+                          <div className={`w-10 h-10 rounded-xl grid place-items-center ${card.iconStyle}`}>
+                            <Icon className="w-5 h-5" />
+                          </div>
+                          {!enabled && (
+                            <span className="text-[11px] font-semibold text-amber-500">Paused by Admin</span>
+                          )}
                         </div>
                         <div>
                           <h2 data-i18n={card.tk} className="font-display text-base font-bold text-[var(--text)]">
@@ -977,10 +1136,15 @@ export default function App() {
                 activePlan={activePlan}
                 prefill={lessonPrefill}
                 hasUnsavedChanges={hasUnsavedPlanChanges}
+                maintenanceMode={siteSettings.maintenanceMode}
                 onSetActivePlan={(p) => setActivePlan(p)}
                 onSavePlan={handleSavePlan}
                 onCreateAssessmentFromPlan={handleCreateAssessmentFromPlan}
                 onCreateMethodologyFromPlan={handleCreateMethodologyFromPlan}
+                onBackHome={() => {
+                  setInWorkspace(false);
+                  syncAdminUrl('dashboard', false);
+                }}
                 onToast={showToast}
                 onCopy={copyText}
               />
@@ -992,6 +1156,11 @@ export default function App() {
                 graphicsQuality={graphicsQuality}
                 threads={chats}
                 activeThreadId={activeChatId}
+                maintenanceMode={siteSettings.maintenanceMode}
+                onBackHome={() => {
+                  setInWorkspace(false);
+                  syncAdminUrl('dashboard', false);
+                }}
                 onUpdateThreads={handleChatsUpdate}
                 onToast={showToast}
                 onCopy={copyText}
@@ -1003,6 +1172,11 @@ export default function App() {
                 lang={lang}
                 history={assessments}
                 prefill={assessmentPrefill}
+                maintenanceMode={siteSettings.maintenanceMode}
+                onBackHome={() => {
+                  setInWorkspace(false);
+                  syncAdminUrl('dashboard', false);
+                }}
                 onSaveHistory={handleAssessmentsUpdate}
                 onToast={showToast}
                 onCopy={copyText}
@@ -1014,6 +1188,11 @@ export default function App() {
                 lang={lang}
                 history={methodologies}
                 prefill={methodologyPrefill}
+                maintenanceMode={siteSettings.maintenanceMode}
+                onBackHome={() => {
+                  setInWorkspace(false);
+                  syncAdminUrl('dashboard', false);
+                }}
                 onSaveHistory={handleMethodologiesUpdate}
                 onToast={showToast}
                 onCopy={copyText}
@@ -1056,6 +1235,7 @@ export default function App() {
                 lang={lang}
                 onToast={showToast}
                 onBack={() => switchView('dashboard')}
+                onSettingsUpdated={() => void refreshSiteConfig()}
               />
             )}
           </main>

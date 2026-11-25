@@ -303,27 +303,203 @@ export function lessonPlanToWordHtml(plan: LessonPlanData, lang: Lang): string {
   `;
 }
 
+export interface AssessmentExportMeta {
+  subject?: string;
+  classLevel?: string;
+  assessmentType?: string;
+}
+
+export interface NumberedAssessmentQuestion {
+  number: number;
+  displayNumber: number;
+  type: string;
+  question: string;
+  options: string[];
+  marks: number;
+  answer: string;
+  markingNotes: string;
+}
+
+export interface AssessmentSectionGroup {
+  title: string | null;
+  questions: NumberedAssessmentQuestion[];
+}
+
+function getBucketForType(qType: string): 'A' | 'B' | 'C' {
+  const norm = (qType || '').toLowerCase();
+  if (norm === 'mcq') return 'A';
+  if (norm === 'fill_blank' || norm === 'matching' || norm === 'true_false') return 'B';
+  return 'C';
+}
+
+function getBucketSubtitle(bucket: 'A' | 'B' | 'C', typesInBucket: Set<string>, lang: Lang): string {
+  if (bucket === 'A') {
+    if (lang === 'rw') return 'Hitamo igisubizo cy’ukuri';
+    if (lang === 'fr') return 'Questions à choix multiple (Choisissez la bonne réponse)';
+    if (lang === 'sw') return 'Maswali ya kuchagua jibu sahihi';
+    return 'Multiple Choice Questions (Choose the correct answer)';
+  }
+  if (bucket === 'B') {
+    const parts: string[] = [];
+    if (typesInBucket.has('fill_blank')) {
+      parts.push(
+        lang === 'rw'
+          ? 'Uzuza ahantu hasigaye'
+          : lang === 'fr'
+          ? 'Complétez les blancs'
+          : lang === 'sw'
+          ? 'Jaza nafasi zilizo wazi'
+          : 'Fill in the Blanks'
+      );
+    }
+    if (typesInBucket.has('matching')) {
+      parts.push(
+        lang === 'rw'
+          ? 'Huza ibijyanye'
+          : lang === 'fr'
+          ? 'Appariement'
+          : lang === 'sw'
+          ? 'Oanisha'
+          : 'Matching'
+      );
+    }
+    if (typesInBucket.has('true_false')) {
+      parts.push(
+        lang === 'rw'
+          ? 'Ni ukuri cyangwa Si ukuri'
+          : lang === 'fr'
+          ? 'Vrai ou Faux'
+          : lang === 'sw'
+          ? 'Kweli au Si kweli'
+          : 'True / False'
+      );
+    }
+    return parts.join(' & ') || 'Structured Questions';
+  }
+  const hasShort = typesInBucket.has('short');
+  const hasOpen = typesInBucket.has('open_ended');
+  if (hasShort && hasOpen) {
+    if (lang === 'rw') return 'Ibibazo bigufi n’ibisaba gusobanura';
+    if (lang === 'fr') return 'Questions courtes et questions ouvertes';
+    if (lang === 'sw') return 'Maswali mafupi na ya maelezo';
+    return 'Short & Open-Ended Questions';
+  }
+  if (hasOpen) {
+    if (lang === 'rw') return 'Ibibazo bisaba gusobanura birambuye';
+    if (lang === 'fr') return 'Questions ouvertes';
+    if (lang === 'sw') return 'Maswali ya maelezo';
+    return 'Open-Ended Questions';
+  }
+  if (lang === 'rw') return 'Ibibazo bigufi';
+  if (lang === 'fr') return 'Questions à réponse courte';
+  if (lang === 'sw') return 'Maswali mafupi';
+  return 'Short Answer Questions';
+}
+
+export function groupAssessmentQuestions(
+  data: AssessmentData,
+  assessmentType?: string,
+  lang: Lang = 'en'
+): {
+  sections: AssessmentSectionGroup[];
+  orderedQuestions: NumberedAssessmentQuestion[];
+} {
+  const rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
+  const distinctTypes = new Set(rawQuestions.map((q) => (q.type || 'short').toLowerCase()));
+  const shouldGroup = assessmentType === 'mixed' || distinctTypes.size > 1;
+
+  if (!shouldGroup) {
+    const ordered: NumberedAssessmentQuestion[] = rawQuestions.map((q, idx) => ({
+      ...q,
+      displayNumber: Number(q.number) || idx + 1,
+    }));
+    return {
+      sections: [{ title: null, questions: ordered }],
+      orderedQuestions: ordered,
+    };
+  }
+
+  const buckets: Record<'A' | 'B' | 'C', typeof rawQuestions> = { A: [], B: [], C: [] };
+  for (const q of rawQuestions) {
+    buckets[getBucketForType(q.type)].push(q);
+  }
+
+  const nonEmptyOrder = (['A', 'B', 'C'] as const).filter((k) => buckets[k].length > 0);
+  if (nonEmptyOrder.length <= 1) {
+    const ordered: NumberedAssessmentQuestion[] = rawQuestions.map((q, idx) => ({
+      ...q,
+      displayNumber: Number(q.number) || idx + 1,
+    }));
+    return {
+      sections: [{ title: null, questions: ordered }],
+      orderedQuestions: ordered,
+    };
+  }
+
+  const sectionLetters = ['A', 'B', 'C'];
+  const sections: AssessmentSectionGroup[] = [];
+  const orderedQuestions: NumberedAssessmentQuestion[] = [];
+  let counter = 1;
+
+  nonEmptyOrder.forEach((bucketKey, bucketIdx) => {
+    const list = buckets[bucketKey];
+    const typeSet = new Set(list.map((q) => (q.type || 'short').toLowerCase()));
+    const sectionPrefix =
+      lang === 'rw'
+        ? `IGICE CYA ${sectionLetters[bucketIdx]}`
+        : lang === 'sw'
+        ? `SEHEMU YA ${sectionLetters[bucketIdx]}`
+        : `SECTION ${sectionLetters[bucketIdx]}`;
+    const title = `${sectionPrefix}: ${getBucketSubtitle(bucketKey, typeSet, lang)}`;
+    const numbered: NumberedAssessmentQuestion[] = list.map((q) => {
+      const item: NumberedAssessmentQuestion = {
+        ...q,
+        displayNumber: counter++,
+      };
+      orderedQuestions.push(item);
+      return item;
+    });
+    sections.push({ title, questions: numbered });
+  });
+
+  return { sections, orderedQuestions };
+}
+
 export function assessmentToPlainText(
   data: AssessmentData,
   includeAnswers: boolean,
-  lang: Lang = 'en'
+  lang: Lang = 'en',
+  meta?: AssessmentExportMeta
 ): string {
   const t = (k: string) => translate(lang, k);
-  const lines = [
+  const { sections, orderedQuestions } = groupAssessmentQuestions(data, meta?.assessmentType, lang);
+
+  const headerLines = [
     data.title,
+    ...(meta?.subject ? [`${t('cbc_subject')}: ${meta.subject}${meta.classLevel ? ` | ${t('cbc_class')}: ${meta.classLevel}` : ''}`] : []),
     `${t('assess_total_marks')}: ${data.totalMarks}`,
     `${t('assess_instructions')}: ${data.instructions}`,
     '',
-    ...data.questions.map((q) => {
-      const opts = q.options.length ? '\n' + q.options.map((o) => `   ${o}`).join('\n') : '';
-      return `${q.number}. ${q.question} (${formatQuestionMarks(q.marks, lang)})${opts}`;
-    }),
   ];
+
+  const questionLines: string[] = [];
+  for (const sec of sections) {
+    if (sec.title) {
+      questionLines.push(sec.title);
+    }
+    for (const q of sec.questions) {
+      const opts = q.options.length ? '\n' + q.options.map((o) => `   ${o}`).join('\n') : '';
+      questionLines.push(`${q.displayNumber}. ${q.question} (${formatQuestionMarks(q.marks, lang)})${opts}`);
+    }
+    if (sec.title) questionLines.push('');
+  }
+
+  const lines = [...headerLines, ...questionLines];
 
   if (includeAnswers) {
     lines.push('', t('assess_answer_key_title').toUpperCase(), '========================================');
-    data.questions.forEach((q) => {
-      lines.push(`${q.number}. ${t('assess_col_answer')}: ${q.answer} (${formatQuestionMarks(q.marks, lang)})`);
+    orderedQuestions.forEach((q) => {
+      lines.push(`${q.displayNumber}. ${t('assess_col_answer')}: ${q.answer} (${formatQuestionMarks(q.marks, lang)})`);
       if (q.markingNotes) lines.push(`   ${t('assess_col_notes')}: ${q.markingNotes}`);
     });
   }
@@ -333,52 +509,114 @@ export function assessmentToPlainText(
 export function assessmentToWordHtml(
   data: AssessmentData,
   includeAnswers: boolean,
-  lang: Lang = 'en'
+  lang: Lang = 'en',
+  meta?: AssessmentExportMeta
 ): string {
   const t = (k: string) => translate(lang, k);
+  const subjectName = (meta?.subject || '').trim() || '—';
+  const classNameText = (meta?.classLevel || '').trim() || '....................';
+  const { sections, orderedQuestions } = groupAssessmentQuestions(data, meta?.assessmentType, lang);
+
+  const renderQuestion = (q: NumberedAssessmentQuestion) => {
+    const isMatching = q.type === 'matching';
+    const isShortOrOpen = q.type === 'short' || q.type === 'open_ended';
+    const linesCount = (Number(q.marks) || 1) >= 3 ? 4 : 2;
+    const writingLines =
+      '<div style="color: #666; font-family: monospace; letter-spacing: -1px; margin-top: 8px; line-height: 1.5;">' +
+      Array(linesCount).fill('................................................................................').join('<br/>') +
+      '</div>';
+
+    return `
+    <div style="margin-bottom: 14pt; page-break-inside: avoid;">
+      <p style="margin: 4px 0;"><strong>${q.displayNumber}.</strong> ${escHtml(q.question)} <span style="float: right; font-weight: bold;">(${escHtml(formatQuestionMarks(q.marks, lang))})</span></p>
+      ${
+        isMatching
+          ? `<div style="margin-left: 15pt; font-size: 10pt; color: #333;"><em>(Match items in Column A with Column B)</em></div>`
+          : ''
+      }
+      ${
+        q.options.length
+          ? `<ul style="list-style: ${isMatching ? 'none' : 'disc'}; padding-left: ${isMatching ? '0' : '18pt'}; margin: 6px 0;">${q.options
+              .map(
+                (o) =>
+                  `<li style="margin: 3px 0; ${isMatching ? 'display:inline-block; width:48%; vertical-align:top;' : ''}">${escHtml(o)}</li>`
+              )
+              .join('')}</ul>`
+          : ''
+      }
+      ${isShortOrOpen ? writingLines : ''}
+    </div>`;
+  };
+
   return `
-    <h2>${escHtml(data.title)}</h2>
-    <p><strong>${escHtml(t('assess_total_marks'))}:</strong> ${data.totalMarks}</p>
-    <p><strong>${escHtml(t('assess_instructions'))}:</strong> ${escHtml(data.instructions)}</p>
-    <hr/>
-    ${data.questions
-      .map(
-        (q) => `
-      <div style="margin-bottom:10pt;">
-        <p><strong>${q.number}. ${escHtml(q.question)}</strong> <em>(${escHtml(formatQuestionMarks(q.marks, lang))})</em></p>
-        ${
-          q.options.length
-            ? `<ul style="list-style:none;padding-left:14pt;">${q.options
-                .map((o) => `<li>${escHtml(o)}</li>`)
-                .join('')}</ul>`
-            : ''
-        }
-      </div>`
-      )
-      .join('')}
-    ${
-      includeAnswers
-        ? `
-      <hr/>
-      <h3>${escHtml(t('assess_answer_key_title'))}</h3>
-      <table>
-        <thead><tr><th>#</th><th>${escHtml(t('assess_col_answer'))}</th><th>${escHtml(t('assess_col_marks'))}</th><th>${escHtml(t('assess_col_notes'))}</th></tr></thead>
-        <tbody>
-          ${data.questions
-            .map(
-              (q) => `
-            <tr>
-              <td>${q.number}</td>
-              <td>${escHtml(q.answer)}</td>
-              <td>${q.marks}</td>
-              <td>${escHtml(q.markingNotes)}</td>
-            </tr>`
-            )
-            .join('')}
-        </tbody>
-      </table>`
-        : ''
-    }
+    <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; color: #000;">
+      <div style="text-align: center; border: 2px solid #000; padding: 12px; margin-bottom: 20px;">
+        <h3 style="margin: 0; font-size: 14pt;">REPUBLIC OF RWANDA</h3>
+        <p style="margin: 3px 0; font-size: 11pt; font-weight: bold;">MINISTRY OF EDUCATION — REB CBC ASSESSMENT</p>
+        <hr style="border: 1px solid #000; margin: 8px 0;" />
+        <table style="width: 100%; border: none; font-size: 10pt; text-align: left; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 4px; border: none;"><strong>School:</strong> ........................................</td>
+            <td style="padding: 4px; border: none;"><strong>Class:</strong> ${escHtml(classNameText)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px; border: none;"><strong>Pupil's Name:</strong> ........................................</td>
+            <td style="padding: 4px; border: none;"><strong>Date:</strong> ....................</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px; border: none;"><strong>Subject:</strong> ${escHtml(subjectName)}</td>
+            <td style="padding: 4px; border: none;"><strong>Total Marks:</strong> ... / ${data.totalMarks}</td>
+          </tr>
+        </table>
+      </div>
+      
+      <h2 style="text-align: center; font-size: 13pt; margin-bottom: 5px;">${escHtml(data.title)}</h2>
+      <p style="text-align: center; font-style: italic; font-size: 10pt; margin-bottom: 20px;"><strong>Instructions:</strong> ${escHtml(data.instructions)}</p>
+      
+      ${sections
+        .map(
+          (sec) => `
+          ${
+            sec.title
+              ? `<h3 style="font-size: 11pt; margin: 16pt 0 8pt; padding-bottom: 3pt; border-bottom: 1.5px solid #000; text-transform: uppercase;">${escHtml(sec.title)}</h3>`
+              : ''
+          }
+          ${sec.questions.map(renderQuestion).join('')}
+        `
+        )
+        .join('')}
+      
+      ${
+        includeAnswers
+          ? `
+        <br/><hr/><br/>
+        <h3>${escHtml(t('assess_answer_key_title'))}</h3>
+        <table border="1" style="width: 100%; border-collapse: collapse; font-size: 10pt;">
+          <thead>
+            <tr style="background: #eee;">
+              <th style="padding: 6px; text-align: left;">#</th>
+              <th style="padding: 6px; text-align: left;">${escHtml(t('assess_col_answer'))}</th>
+              <th style="padding: 6px; text-align: left;">${escHtml(t('assess_col_marks'))}</th>
+              <th style="padding: 6px; text-align: left;">${escHtml(t('assess_col_notes'))}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${orderedQuestions
+              .map(
+                (q) => `
+              <tr>
+                <td style="padding: 6px;">${q.displayNumber}</td>
+                <td style="padding: 6px;">${escHtml(q.answer)}</td>
+                <td style="padding: 6px;">${q.marks}</td>
+                <td style="padding: 6px;">${escHtml(q.markingNotes)}</td>
+              </tr>`
+              )
+              .join('')}
+          </tbody>
+        </table>`
+          : ''
+      }
+    </div>
   `;
 }
 

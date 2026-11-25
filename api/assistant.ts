@@ -1,4 +1,5 @@
 import { formatErrorResponse, generateAssistantReply } from '../server/aiService.js';
+import { checkAiMaintenanceMode, recordActivity } from '../server/adminService.js';
 import { ApiRequest, ApiResponse, parseRequestBody, withApiErrorHandler } from './_utils.js';
 
 export default withApiErrorHandler<ApiRequest, ApiResponse>(
@@ -16,6 +17,20 @@ export default withApiErrorHandler<ApiRequest, ApiResponse>(
         status: 405,
         message: 'Method not allowed',
         error: 'Method not allowed',
+        route: '/api/assistant',
+      });
+      return;
+    }
+
+    const maintenance = await checkAiMaintenanceMode();
+    if (maintenance.blocked) {
+      res.status(503).json({
+        status: 503,
+        code: 'MAINTENANCE_MODE',
+        maintenanceMode: true,
+        title: maintenance.title,
+        message: `${maintenance.title}. ${maintenance.message}`,
+        error: `${maintenance.title}. ${maintenance.message}`,
         route: '/api/assistant',
       });
       return;
@@ -52,6 +67,13 @@ export default withApiErrorHandler<ApiRequest, ApiResponse>(
       useWebSearch: body.useWebSearch !== false,
     });
 
+    await recordActivity(
+      'assistant',
+      'General',
+      'All',
+      typeof body.language === 'string' ? body.language : 'en',
+      'AI Assistant answered query'
+    );
     res.status(200).json({ reply: result.reply, sources: result.sources });
   }
 );

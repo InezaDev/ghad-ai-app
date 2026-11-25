@@ -161,3 +161,54 @@ export interface AppBackup {
   assessments: SavedAssessment[];
   methodologies: SavedMethodology[];
 }
+
+export interface SiteSettings {
+  bannerText: string;
+  bannerActive: boolean;
+  maintenanceMode: boolean;
+  toolLesson: boolean;
+  toolAssistant: boolean;
+  toolAssessment: boolean;
+  toolMethodology: boolean;
+}
+
+export interface DeveloperProfile {
+  name: string;
+  title: string;
+  school: string;
+  bio: string;
+  photoUrl: string;
+  phone: string;
+  email: string;
+  github: string;
+  localizedTitles?: Partial<Record<Lang, string>>;
+  localizedBios?: Partial<Record<Lang, string>>;
+}
+
+export interface LessonClarification {
+  issueType: 'subject_topic_mismatch' | 'subject_level_mismatch' | 'unit_topic_mismatch';
+  title: string;
+  message: string;
+  selectedSubject: string;
+  selectedClass: string;
+  enteredTopic: string;
+  suggestedSubject?: string;
+  suggestedClass?: string;
+  questions: string[];
+}
+
+export interface LessonQualityReport {
+  passed: boolean;
+  curriculumVerified: boolean;
+  checks: {
+    subjectTopicConsistent: boolean;
+    singleCleanTitle: boolean;
+    grammarAndPurityCleaned: boolean;
+    objectivesActivitiesAligned: boolean;
+    durationMatches: boolean;
+    senAdapted: boolean;
+    noInventedResults: boolean;
+    completeStructure: boolean;
+  };
+  correctionsApplied: string[];
+}

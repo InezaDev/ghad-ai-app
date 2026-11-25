@@ -1,4 +1,5 @@
 import { formatErrorResponse, generateRebMethodology } from '../server/aiService.js';
+import { checkAiMaintenanceMode, recordActivity } from '../server/adminService.js';
 import { ApiRequest, ApiResponse, parseRequestBody, withApiErrorHandler } from './_utils.js';
 
 export default withApiErrorHandler<ApiRequest, ApiResponse>(
@@ -16,6 +17,20 @@ export default withApiErrorHandler<ApiRequest, ApiResponse>(
         status: 405,
         message: 'Method not allowed',
         error: 'Method not allowed',
+        route: '/api/methodology',
+      });
+      return;
+    }
+
+    const maintenance = await checkAiMaintenanceMode();
+    if (maintenance.blocked) {
+      res.status(503).json({
+        status: 503,
+        code: 'MAINTENANCE_MODE',
+        maintenanceMode: true,
+        title: maintenance.title,
+        message: `${maintenance.title}. ${maintenance.message}`,
+        error: `${maintenance.title}. ${maintenance.message}`,
         route: '/api/methodology',
       });
       return;
@@ -54,6 +69,13 @@ export default withApiErrorHandler<ApiRequest, ApiResponse>(
       classSize: typeof body.classSize === 'number' ? body.classSize : Number(body.classSize) || undefined,
     });
 
+    await recordActivity(
+      'methodology',
+      subject,
+      classLevel,
+      typeof body.language === 'string' ? body.language : 'en',
+      `Generated teaching methodology for ${subject} (${classLevel})`
+    );
     res.status(200).json({ methodology });
   }
 );

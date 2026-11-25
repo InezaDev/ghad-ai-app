@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
+  AlertTriangle,
   BookmarkPlus,
+  CheckCircle2,
   ClipboardCheck,
   Compass,
   Copy,
@@ -17,7 +19,14 @@ import {
   Zap,
   X,
 } from 'lucide-react';
-import { Lang, LessonPlanData, PrintOrientation, TeacherProfile } from '../types/ghad';
+import {
+  Lang,
+  LessonClarification,
+  LessonPlanData,
+  LessonQualityReport,
+  PrintOrientation,
+  TeacherProfile,
+} from '../types/ghad';
 import { translate } from '../i18n/translations';
 import { RebLessonPlanTable } from './RebLessonPlanTable';
 import {
@@ -26,7 +35,8 @@ import {
   lessonPlanToWordHtml,
   printOrDownloadHtml,
 } from '../utils/export';
-import { AiClientError, requestLessonPlan } from '../services/aiClient';
+import { AiClientError, LessonPlanApiResult, requestLessonPlan } from '../services/aiClient';
+import { MaintenanceNotice } from './MaintenanceNotice';
 
 const RWANDA_SUBJECTS = [
   'Mathematics',
@@ -78,10 +88,12 @@ interface LessonPlannerViewProps {
   activePlan: LessonPlanData | null;
   prefill?: { subject: string; classLevel: string; nonce: number } | null;
   hasUnsavedChanges?: boolean;
+  maintenanceMode?: boolean;
   onSetActivePlan: (plan: LessonPlanData | null) => void;
   onSavePlan: (plan: LessonPlanData) => void;
   onCreateAssessmentFromPlan?: (plan: LessonPlanData) => void;
   onCreateMethodologyFromPlan?: (plan: LessonPlanData) => void;
+  onBackHome?: () => void;
   onToast: (msg: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
   onCopy: (text: string) => void;
 }
@@ -92,10 +104,12 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
   activePlan,
   prefill,
   hasUnsavedChanges = false,
+  maintenanceMode = false,
   onSetActivePlan,
   onSavePlan,
   onCreateAssessmentFromPlan,
   onCreateMethodologyFromPlan,
+  onBackHome,
   onToast,
   onCopy,
 }) => {
@@ -119,6 +133,8 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
   const [loading, setLoading] = useState(false);
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [clarification, setClarification] = useState<LessonClarification | null>(null);
+  const [qualityReport, setQualityReport] = useState<LessonQualityReport | null>(null);
   const [mobileTab, setMobileTab] = useState<'setup' | 'preview'>(activePlan ? 'preview' : 'setup');
   const [printOrientation, setPrintOrientation] = useState<PrintOrientation>('portrait');
 
@@ -230,6 +246,8 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
 
   const handleSampleLesson = () => {
     setErrorMsg(null);
+    setClarification(null);
+    setQualityReport(null);
     const chosenSubject = effectiveSubject || 'Mathematics';
     const chosenClass = classLevel || 'P4';
     const rawTopic = cleanTopicLabel(topic);
@@ -244,8 +262,8 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
       lang === 'rw' || /\b(i?kinyarwanda)\b/i.test(chosenSubject);
 
     if (isKinyarwandaSample) {
-      const rwSubject =
-        chosenSubject === 'Mathematics' && lang === 'rw' ? 'Ikinyarwanda' : chosenSubject;
+      // Never silently switch the teacher's selected subject
+      const rwSubject = chosenSubject;
       const rwTopic =
         rawTopic ||
         (rwSubject.toLowerCase().includes('kinyarwanda')
@@ -270,10 +288,10 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
         unitTitle: rwUnit,
         keyUnitCompetence: `Gushobora gusoma neza, gusobanura igitekerezo nyamukuru no gukoresha imvugo inoze kuri ${rwTopic.toLowerCase()} mu isomo rya ${rwSubject} (${chosenClass}).`,
         lessonTitle: rwTopic,
-        instructionalObjective: `Bahawe umwandiko n'amakarita y'amagambo mu matsinda, abanyeshuri ba ${chosenClass} bazashobora gusoma no gusubiza ibibazo kuri "${rwTopic}" neza ku kigero cya byibura 80%.`,
+        instructionalObjective: `Bahawe umwandiko n'amakarita y'amagambo mu matsinda, abanyeshuri ba ${chosenClass} bazashobora gusoma no gusubiza ibibazo kuri "${rwTopic}" neza (byibura ibibazo 4 kuri 5).`,
         planLocation: 'Imbere mu ishuri — abanyeshuri bicaye mu matsinda avanze y’abanyeshuri 5.',
         learningMaterials: `Igitabo cy'umunyeshuri cya REB (${rwSubject} ${chosenClass}), ikibaho, ingwa, amakarita yanditse mu nyuguti nini, n'amafoto ajyanye n'isomo.`,
-        references: `REB (2020) Integanyanyigisho n'Igitabo cy'Umwarimu bya ${rwSubject} mu mashuri yo mu Rwanda (${chosenClass}), Umutwe wa ${unitNo || '1'}.`,
+        references: `Integanyanyigisho ya REB n'Igitabo cy'Umwarimu bya ${rwSubject} (${chosenClass}), Umutwe wa ${unitNo || '1'} — genzura amapaji kuri elearning.reb.rw.`,
         activityOverview: `Abanyeshuri barasoma mu matsinda, bungurane ibitekerezo ku magambo mashya kandi bakore imyitozo kuri "${rwTopic}" mu buryo buri wese yibonamo.`,
         stages: [
           {
@@ -281,7 +299,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
             stageType: 'intro',
             stageName: t('cbc_stage_intro'),
             timingMinutes: intro,
-            teacherActivities: `1. Gusuhuza abanyeshuri, kubara abitabiriye no kureba ko abafite ubumuga bwo kutabona neza bicaye imbere.\n2. Kubaza ibibazo 2 byoroshye bihuje ubuzima busanzwe n'isomo rya "${rwTopic}".\n3. Kwandika umutwe w'isomo ku kibaho mu nyandiko isobanutse.\n4. Gusobanurira abanyeshuri intego y'isomo n'ubushobozi bwitezwe muri iri somo.`,
+            teacherActivities: `1. Gusuhuza abanyeshuri, kubara abitabiriye no kureba ko abafite ibyihariye (${activeSen}) bafashijwe mu myanya myiza.\n2. Kubaza ibibazo 2 byoroshye bihuje ubuzima busanzwe n'isomo rya "${rwTopic}".\n3. Kwandika umutwe w'isomo ku kibaho mu nyandiko isobanutse.\n4. Gusobanurira abanyeshuri intego y'isomo n'ubushobozi bwitezwe muri iri somo.`,
             learnerActivities: `1. Kwikiriza umwarimu neza no gutegura amakayi n'amakaramu.\n2. Gusubiza ibibazo by'umwarimu bakoresheje ingero zo mu buzima busanzwe.\n3. Gusoma umutwe w'isomo mu ijwi riranguruye no kuwandika mu makayi.\n4. Kugaragaza muri make ibyo biteze kwiga no kunguka muri iri somo.`,
             competencesAndIssues:
               'Itumanaho: abanyeshuri batanga ibitekerezo mu Kinyarwanda cyumvikana.\nUburezi budaheza: imyanya y’imbere n’amakarita yanditse mu nyuguti nini bifasha buri munyeshuri.',
@@ -292,7 +310,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
             stageName: t('cbc_stage_body'),
             timingMinutes: dev,
             teacherActivities: `1. Igikorwa mu matsinda: Guha buri tsinda ry'abanyeshuri 5 umwandiko n'amakarita y'amagambo kuri "${rwTopic}".\n2. Gusaba abanyeshuri gusoma bucece no gushakira hamwe ibisobanuro by'amagambo mashya.\n3. Gutembera mu ishuri ugenzura ko buri munyeshuri arimo gufashwa kandi atanga igitekerezo.\n4. Gutumira abahagarariye amatsinda kumurika ibyo bagezeho ku kibaho mu buryo busobanutse.\n5. Kunoza no gukosora imyandikire n'imvugo, ugashimangira iby'ingenzi bigize isomo.\n6. Guha abanyeshuri imyitozo 3 yo gusobanura no gusesengura mu makayi yabo.`,
-            learnerActivities: `1. Kwicara mu matsinda y'abanyeshuri 5 no gusoma umwandiko bahawe bucece.\n2. Gusesengura amagambo mashya no kungurana ibitekerezo mu bwubahane.\n3. Kwandika imyanzuro n'ibisubizo by'itsinda ku rupapuro rwo kumurika.\n4. Kumurika ibisubizo by'itsinda imbere y'abandi banyeshuri.\n5. Kwandika incamake yemejwe n'umwarimu mu makayi yabo y'Ikinyarwanda.\n6. Gukora imyitozo 3 y'isuzuma mu makayi ku giti cyabo no gukosora amakosa.`,
+            learnerActivities: `1. Kwicara mu matsinda y'abanyeshuri 5 no gusoma umwandiko bahawe bucece.\n2. Gusesengura amagambo mashya no kungurana ibitekerezo mu bwubahane.\n3. Kwandika imyanzuro n'ibisubizo by'itsinda ku rupapuro rwo kumurika.\n4. Kumurika ibisubizo by'itsinda imbere y'abandi banyeshuri.\n5. Kwandika incamake yemejwe n'umwarimu mu makayi yabo.\n6. Gukora imyitozo 3 y'isuzuma mu makayi ku giti cyabo no gukosora amakosa.`,
             competencesAndIssues:
               'Gutekereza byimbitse n’Ubufatanye: abanyeshuri basesengura umwandiko mu matsinda.\nAmahoro n’indangagaciro n’Uburinganire: abahungu n’abakobwa bahabwa ijambo mu buryo bungana kandi bakumvana mu bwubahane.',
           },
@@ -301,13 +319,13 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
             stageType: 'conclusion',
             stageName: t('cbc_stage_concl'),
             timingMinutes: concl,
-            teacherActivities: `1. Gufasha abanyeshuri kuvuga mu nteruro ngufi ibyo bize n'isomo rikomeye bakuyemo.\n2. Kubaza ibibazo 2 by'isuzuma rya nyuma kugira ngo umenye ko intego y'isomo yagezweho.\n3. Gutanga inama no gushimira abanyeshuri bose ku bwitange n'ubufatanye bagaragaje.`,
-            learnerActivities: `1. Kuvuga mu magambo yabo amasomo akomeye bakuye muri iri somo.\n2. Gusubiza ibibazo 2 by'isuzuma rya nyuma mu makayi cyangwa mu magambo.\n3. Gutega amatwi inama z'umwarimu no gutunganya ibikoresho by'ishuri.`,
+            teacherActivities: `1. Gufasha abanyeshuri kuvuga mu nteruro ngufi ibyo bize n'isomo rikomeye bakuyemo.\n2. Uburyo bw'isuzuma: Kubaza ibibazo 2 by'isuzuma rya nyuma mu makayi kugira ngo umwarimu amenye niba intego y'isomo yagezweho.\n3. Gutanga inama no gushimira abanyeshuri bose ku bwitange n'ubufatanye bagaragaje.`,
+            learnerActivities: `1. Kuvuga mu magambo yabo amasomo akomeye bakuye muri iri somo.\n2. Gusubiza ibibazo 2 by'isuzuma rya nyuma mu makayi ku giti cyabo.\n3. Gutega amatwi inama z'umwarimu no gutunganya ibikoresho by'ishuri.`,
             competencesAndIssues:
               'Kwiga ubuzima bwose: abanyeshuri basobanukirwa agaciro ko kwisomera umwandiko.\nUmuco w’ubuziranenge: kwandika no kuvuga Ikinyarwanda cy’umwimerere kitagira amakosa.',
           },
         ],
-        teacherSelfEvaluation: `Isomo rya "${rwTopic}" ryatanzwe mu minota ${total}. Abanyeshuri bagera kuri ___% bageze ku ntego y'isomo; abanyeshuri ___ bakeneye ubufasha bwihariye bazahabwa imyitozo y'inyongera.`,
+        teacherSelfEvaluation: `Bizuzuzwa n'umwarimu nyuma yo kwigisha: (1) Andika umubare w'abanyeshuri bashoboye kugera ku ntego y'isomo "${rwTopic}" mu isuzuma ryo mu minota ${total}. (2) Garagaza ibikorwa n'imfashanyigisho byafashije cyane harimo n'ubufasha bwa (${activeSen}). (3) Teganya imyitozo yo gufasha abatarabonye intego neza mu isomo ritaha.`,
       };
 
       setPlanFromSelf(rwPlan);
@@ -318,7 +336,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
     const isSreEquity =
       chosenSubject === 'Social and Religious Education (SRE)' ||
       chosenSubject === 'Social & Religious Studies (SRS)' ||
-      /\bequity\b|\bequality\b/i.test(rawTopic);
+      (!effectiveSubject && /\bequity\b|\bequality\b/i.test(rawTopic));
 
     const isDefaultMathSample =
       chosenSubject === 'Mathematics' && (!rawTopic || /\bfraction/i.test(rawTopic));
@@ -326,10 +344,8 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
     if (isSreEquity) {
       const sreTopic = rawTopic || 'Equity and Equality';
       const sreUnit = unitTitle.trim() || 'Human Rights, Equity, and Social Cohesion';
-      setSubject('Social and Religious Education (SRE)');
-      setCustomSubject('');
-      setTopic(sreTopic);
-      setUnitTitle(sreUnit);
+      if (!topic.trim()) setTopic(sreTopic);
+      if (!unitTitle.trim()) setUnitTitle(sreUnit);
 
       const srePlan: LessonPlanData = {
         schoolName: schoolName.trim() || profile.schoolName || 'GS Kigali',
@@ -391,7 +407,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
           },
         ],
         teacherSelfEvaluation:
-          `Lesson delivered in ${total} minutes using picture cards and role-play. About ___% of students correctly explained the difference between equity and equality; extra help will be given to the ___ students who need more examples.`,
+          `To be completed by the teacher after teaching: (1) Record the actual number of learners who explained equity vs. equality and gave 3 school/home fairness examples during the ${total}-minute lesson. (2) Note which picture cards, role-play tasks, and SEN adaptations (${activeSen}) worked effectively. (3) Plan remedial coaching or extension work for the next lesson.`,
       };
 
       setPlanFromSelf(srePlan);
@@ -470,7 +486,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
               'Standardization culture: students write fractions neatly and correctly.\nLifelong learning: students connect fractions to daily household measurements.',
           },
         ],
-        teacherSelfEvaluation: `Lesson taught in ${total} minutes. About ___% of students got both exit questions right. Extra practice will be given to the ___ students who added the bottom numbers by mistake.`,
+        teacherSelfEvaluation: `To be completed by the teacher after teaching: (1) Record the actual number of learners who correctly solved both exit questions without adding denominators during the ${total}-minute lesson. (2) Evaluate how well the folded paper strips and SEN adaptations (${activeSen}) supported learner mastery. (3) Specify follow-up remedial practice with fraction strips for learners who need support.`,
       };
 
       setPlanFromSelf(samplePlan);
@@ -563,7 +579,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
           competencesAndIssues: topicCompetencePair.conclComp,
         },
       ],
-      teacherSelfEvaluation: `Lesson on ${dynamicTopic} (${chosenClass} ${chosenSubject}) was taught in ${total} minutes. About ___% of students met the lesson goal; extra support will be given to the ___ students needing more practice.`,
+      teacherSelfEvaluation: `To be completed by the teacher after teaching: (1) Record the actual number of learners who achieved the instructional objective on ${dynamicTopic} (${chosenClass} ${chosenSubject}) during the ${total}-minute exit assessment. (2) Note which group activities, learning aids, and SEN adaptations (${activeSen}) were effective. (3) Specify remedial or extension follow-up actions for the next session.`,
     };
 
     setPlanFromSelf(dynamicPlan);
@@ -572,6 +588,8 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
 
   const handleBlankTemplate = () => {
     setErrorMsg(null);
+    setClarification(null);
+    setQualityReport(null);
     const total = Number(duration) || 40;
     const { intro, dev, concl } = splitDurationMinutes(total);
 
@@ -638,12 +656,21 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
     onToast(t('toast_gen_cancelled'), 'info');
   };
 
-  const runLessonAi = async (mode: 'generate' | 'complete_missing') => {
+  const runLessonAi = async (
+    mode: 'generate' | 'complete_missing',
+    overrides?: { subject?: string; classLevel?: string; confirmOverride?: boolean }
+  ) => {
+    if (maintenanceMode) {
+      const msg = 'GHAD AI is currently in maintenance mode. AI lesson generation is temporarily paused.';
+      setErrorMsg(msg);
+      onToast(msg, 'warning');
+      return;
+    }
     const draftPlan = mode === 'complete_missing' ? activePlan || undefined : undefined;
     const resolvedSubject =
-      effectiveSubject || (draftPlan?.subject || '').trim();
+      (overrides?.subject ?? effectiveSubject) || (draftPlan?.subject || '').trim();
     const resolvedClass =
-      (classLevel || '').trim() || (draftPlan?.classLevel || '').trim();
+      (overrides?.classLevel ?? classLevel).trim() || (draftPlan?.classLevel || '').trim();
     const cleanedTopic = cleanTopicLabel(topic || draftPlan?.lessonTitle || '');
     const resolvedUnitTitle = (unitTitle || draftPlan?.unitTitle || '').trim();
     const resolvedUnitNo = (unitNo || draftPlan?.unitNo || '').trim();
@@ -668,6 +695,8 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
     abortRef.current = controller;
 
     setErrorMsg(null);
+    setClarification(null);
+    setQualityReport(null);
     setRetryCountdown(null);
     setLoading(true);
 
@@ -688,14 +717,15 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
       teacherName: (teacherName || draftPlan?.teacherName || profile?.teacherName || '').trim(),
       extra: (extra || '').trim(),
       mode,
+      confirmOverride: Boolean(overrides?.confirmOverride),
       existingPlan: draftPlan,
       signal: controller.signal,
     };
 
     try {
-      let generated: LessonPlanData;
+      let result: LessonPlanApiResult;
       try {
-        generated = await requestLessonPlan(payload);
+        result = await requestLessonPlan(payload);
       } catch (firstErr) {
         if (firstErr instanceof AiClientError && firstErr.isAborted) return;
         if (firstErr instanceof AiClientError && firstErr.isHighDemand) {
@@ -706,15 +736,24 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
           }
           setRetryCountdown(null);
           if (controller.signal.aborted) return;
-          generated = await requestLessonPlan(payload);
+          result = await requestLessonPlan(payload);
         } else {
           throw firstErr;
         }
       }
 
       if (controller.signal.aborted) return;
-      if (generated.lessonTitle) setTopic(generated.lessonTitle);
-      if (generated.unitTitle) setUnitTitle(generated.unitTitle);
+      if (result.clarificationRequired) {
+        setClarification(result.clarification);
+        setMobileTab('setup');
+        onToast(result.clarification.title, 'warning');
+        return;
+      }
+
+      const generated = result.plan;
+      setQualityReport(result.qualityReport || null);
+      if (!cleanedTopic && generated.lessonTitle) setTopic(generated.lessonTitle);
+      if (!resolvedUnitTitle && generated.unitTitle) setUnitTitle(generated.unitTitle);
       if (generated.schoolName && !schoolName) setSchoolName(generated.schoolName);
       if (generated.teacherName && !teacherName) setTeacherName(generated.teacherName);
       setPlanFromSelf(generated);
@@ -736,6 +775,22 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
   const handleGenerate = () => runLessonAi('generate');
   const handleCompleteMissing = () => runLessonAi('complete_missing');
 
+  const applyClarificationFix = (opts: { subject?: string; classLevel?: string; confirmOverride?: boolean }) => {
+    if (opts.subject) {
+      if (RWANDA_SUBJECTS.includes(opts.subject)) {
+        setSubject(opts.subject);
+        setCustomSubject('');
+      } else {
+        setSubject('Other');
+        setCustomSubject(opts.subject);
+      }
+    }
+    if (opts.classLevel && RWANDA_CLASSES.includes(opts.classLevel)) {
+      setClassLevel(opts.classLevel);
+    }
+    void runLessonAi('generate', opts);
+  };
+
   const hasMissingPlanSections = Boolean(
     activePlan &&
       (!activePlan.unitTitle.trim() ||
@@ -746,6 +801,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
         !activePlan.references.trim() ||
         !activePlan.activityOverview.trim() ||
         !activePlan.teacherSelfEvaluation.trim() ||
+        /_{2,}/.test(activePlan.teacherSelfEvaluation) ||
         activePlan.stages.some(
           (st) =>
             !st.teacherActivities.replace(/\d+[.)]\s*/g, '').trim() ||
@@ -801,6 +857,10 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
           </button>
         </div>
       </div>
+
+      {maintenanceMode && (
+        <MaintenanceNotice variant="workspace" onReturnHome={onBackHome} />
+      )}
 
       {/* Mobile Stacked Tabs */}
       <div className="no-print holo-glass xl:hidden flex items-center gap-1 p-1 rounded-xl border border-[#38bdf8]/25">
@@ -878,7 +938,10 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                 <select
                   id="subject"
                   value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
+                  onChange={(e) => {
+                    setSubject(e.target.value);
+                    setClarification(null);
+                  }}
                   disabled={loading}
                   className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
                 >
@@ -903,7 +966,10 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                     id="lessonSubject"
                     type="text"
                     value={customSubject}
-                    onChange={(e) => setCustomSubject(e.target.value)}
+                    onChange={(e) => {
+                      setCustomSubject(e.target.value);
+                      setClarification(null);
+                    }}
                     disabled={loading}
                     placeholder={t('lesson_ph_other_subj')}
                     className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
@@ -916,7 +982,10 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                 <select
                   id="lessonClass"
                   value={classLevel}
-                  onChange={(e) => setClassLevel(e.target.value)}
+                  onChange={(e) => {
+                    setClassLevel(e.target.value);
+                    setClarification(null);
+                  }}
                   disabled={loading}
                   className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
                 >
@@ -934,7 +1003,10 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                   id="lessonTopic"
                   type="text"
                   value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
+                  onChange={(e) => {
+                    setTopic(e.target.value);
+                    setClarification(null);
+                  }}
                   disabled={loading}
                   placeholder={t('lesson_ph_topic')}
                   className="px-3 py-2 text-sm font-normal rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
@@ -1091,7 +1163,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
               <button
                 id="generateLesson"
                 type="submit"
-                disabled={loading}
+                disabled={loading || maintenanceMode}
                 className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-[#15803D] hover:bg-[#166534] disabled:opacity-60 disabled:cursor-not-allowed rounded-xl transition-colors cursor-pointer whitespace-nowrap"
               >
                 {loading ? (
@@ -1109,7 +1181,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
               {activePlan && (
                 <button
                   type="button"
-                  disabled={loading}
+                  disabled={loading || maintenanceMode}
                   onClick={handleCompleteMissing}
                   className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl border border-[#0284C7]/40 bg-[#0284C7]/10 text-[#0284C7] dark:text-[#38BDF8] hover:bg-[#0284C7]/15 disabled:opacity-50 transition-colors cursor-pointer"
                 >
@@ -1147,6 +1219,70 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                 <Square className="w-3 h-3 fill-current" />
                 {t('cancel_btn')}
               </button>
+            </div>
+          )}
+
+          {/* Inline Consistency Clarification Request */}
+          {clarification && !loading && (
+            <div
+              role="alert"
+              className="p-4 sm:p-5 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50/90 dark:bg-amber-950/35 space-y-3 text-sm text-amber-950 dark:text-amber-100"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                  <div>
+                    <h3 className="font-display font-bold text-sm">{clarification.title}</h3>
+                    <p className="text-xs sm:text-sm mt-1 leading-relaxed">{clarification.message}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setClarification(null)}
+                  aria-label="Dismiss clarification"
+                  className="p-1 text-amber-700 dark:text-amber-300 hover:opacity-75 cursor-pointer shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {clarification.questions.length > 0 && (
+                <ul className="list-disc pl-6 space-y-1 text-xs opacity-90">
+                  {clarification.questions.map((q, idx) => (
+                    <li key={idx}>{q}</li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {clarification.suggestedSubject && (
+                  <button
+                    type="button"
+                    onClick={() => applyClarificationFix({ subject: clarification.suggestedSubject })}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#15803D] text-white hover:bg-[#166534] transition-colors cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {t('clarify_switch_subject')} {clarification.suggestedSubject}
+                  </button>
+                )}
+                {clarification.suggestedClass && (
+                  <button
+                    type="button"
+                    onClick={() => applyClarificationFix({ classLevel: clarification.suggestedClass })}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#0284C7] text-white hover:bg-[#0369A1] transition-colors cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {t('clarify_switch_class')} {clarification.suggestedClass}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => applyClarificationFix({ confirmOverride: true })}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-amber-400 dark:border-amber-700 bg-white/80 dark:bg-black/20 text-amber-900 dark:text-amber-200 hover:bg-white dark:hover:bg-black/30 transition-colors cursor-pointer"
+                >
+                  {t('clarify_keep_override')}
+                </button>
+              </div>
             </div>
           )}
 
@@ -1216,9 +1352,9 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      disabled={loading}
+                      disabled={loading || maintenanceMode}
                       onClick={handleCompleteMissing}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[#F59E0B]/50 bg-[#F59E0B]/10 text-amber-800 dark:text-[#FBBF24] hover:bg-[#F59E0B]/20 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[#F59E0B]/50 bg-[#F59E0B]/10 text-amber-800 dark:text-[#FBBF24] hover:bg-[#F59E0B]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer whitespace-nowrap"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-[#F59E0B]" />
                       <span>{t('btn_complete_missing')}</span>
@@ -1322,7 +1458,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                 )}
               </div>
 
-              {hasMissingPlanSections && !loading && (
+              {hasMissingPlanSections && !loading && !maintenanceMode && (
                 <div className="no-print px-5 py-2.5 border-b border-[#0284C7]/30 bg-[#0284C7]/10 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--text)]">
                   <span>{t('lesson_missing_banner')}</span>
                   <button
@@ -1336,7 +1472,7 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                 </div>
               )}
 
-              {planOutOfSyncWithForm && (
+              {planOutOfSyncWithForm && !maintenanceMode && (
                 <div className="no-print px-5 py-2.5 border-b border-amber-200 dark:border-amber-800/70 bg-amber-50/80 dark:bg-amber-950/25 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-200">
                   <span>
                     {t('lesson_sync_showing')}{' '}
@@ -1357,6 +1493,20 @@ export const LessonPlannerView: React.FC<LessonPlannerViewProps> = ({
                     <Sparkles className="w-3 h-3" />
                     {t('lesson_update_btn')}
                   </button>
+                </div>
+              )}
+
+              {qualityReport && !qualityReport.curriculumVerified && !loading && (
+                <div className="no-print px-5 py-2.5 border-b border-amber-200 dark:border-amber-800/60 bg-amber-50/70 dark:bg-amber-950/20 flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <span>
+                    {t('curriculum_verify_note_pre')}{' '}
+                    <strong>
+                      {activePlan.subject} ({activePlan.classLevel})
+                    </strong>{' '}
+                    {t('curriculum_verify_note_post')}{' '}
+                    <strong>elearning.reb.rw</strong>.
+                  </span>
                 </div>
               )}
 

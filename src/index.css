@@ -381,4 +381,35 @@ html[data-graphics="low"] .card-3d-tilt:hover {
   #assessmentOutput[data-print-answers="false"] .assessment-answer-key {
     display: none !important;
   }
+
+  #assessmentBody,
+  #assessmentBody * {
+    color: #000000 !important;
+  }
+
+  #assessmentBody > div:first-child {
+    background: #ffffff !important;
+    border: 1.5px solid #000000 !important;
+  }
+
+  #assessmentBody .border-dotted {
+    border-color: #334155 !important;
+  }
+
+  #assessmentBody table,
+  #assessmentBody th,
+  #assessmentBody td {
+    border-color: #000000 !important;
+  }
+
+  #assessmentBody th {
+    background-color: #ecfdf5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #assessmentBody .assessment-question-block {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
 }

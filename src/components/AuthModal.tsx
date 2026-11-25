@@ -7,11 +7,22 @@ import {
   signInWithPopup,
   updateProfile,
 } from 'firebase/auth';
-import { AlertCircle, CheckCircle2, Loader2, Lock, Mail, User as UserIcon, X } from 'lucide-react';
+import {
+  AlertCircle,
+  Check,
+  CheckCircle2,
+  Copy,
+  Loader2,
+  Lock,
+  Mail,
+  User as UserIcon,
+  X,
+} from 'lucide-react';
+import firebaseConfig from '../../firebase-applet-config.json';
 import { auth, googleProvider } from '../firebase';
 import { Lang } from '../types/ghad';
 import { translate } from '../i18n/translations';
-import { mapAuthError } from '../utils/authErrors';
+import { extractAuthErrorCode, mapAuthError } from '../utils/authErrors';
 
 interface AuthModalProps {
   open: boolean;
@@ -35,27 +46,65 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string>('');
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
+  const [copiedHost, setCopiedHost] = useState(false);
+  const [emailProviderDisabled, setEmailProviderDisabled] = useState<boolean>(() => {
+    try {
+      return typeof sessionStorage !== 'undefined' && sessionStorage.getItem('ghad_email_auth_disabled') === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const currentHost =
+    typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : '';
 
   useEffect(() => {
     if (open) {
       setMode(initialMode);
       setErrorMsg(null);
+      setErrorCode('');
       setInfoMsg(null);
+      setCopiedHost(false);
     }
   }, [open, initialMode]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
+
+  const handleCopyDomain = async () => {
+    if (!currentHost) return;
+    try {
+      await navigator.clipboard?.writeText(currentHost);
+      setCopiedHost(true);
+      setTimeout(() => setCopiedHost(false), 1800);
+    } catch {
+      // Ignore clipboard failures
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     setBusy(true);
     setErrorMsg(null);
+    setErrorCode('');
     setInfoMsg(null);
     try {
       await signInWithPopup(auth, googleProvider);
       onSuccess(t('auth_google_success'));
       onClose();
     } catch (err) {
+      setErrorCode(extractAuthErrorCode(err));
       setErrorMsg(mapAuthError(err, t));
     } finally {
       setBusy(false);
@@ -70,11 +119,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     if (!cleanEmail || !cleanPass) {
       setErrorMsg(t('auth_err_missing_fields'));
+      setErrorCode('');
+      return;
+    }
+
+    if (emailProviderDisabled) {
+      setErrorCode('auth/operation-not-allowed');
+      setErrorMsg(t('auth_err_op_not_allowed'));
       return;
     }
 
     setBusy(true);
     setErrorMsg(null);
+    setErrorCode('');
     setInfoMsg(null);
 
     try {
@@ -101,6 +158,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onClose();
       }
     } catch (err) {
+      const code = extractAuthErrorCode(err);
+      setErrorCode(code);
+      if (code === 'auth/operation-not-allowed') {
+        setEmailProviderDisabled(true);
+        try {
+          sessionStorage.setItem('ghad_email_auth_disabled', '1');
+        } catch {
+          // Ignore storage failure
+        }
+      }
       setErrorMsg(mapAuthError(err, t));
     } finally {
       setBusy(false);
@@ -111,20 +178,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const cleanEmail = email.trim();
     if (!cleanEmail) {
       setErrorMsg(t('auth_err_enter_email_reset'));
+      setErrorCode('');
       return;
     }
     setBusy(true);
     setErrorMsg(null);
+    setErrorCode('');
     setInfoMsg(null);
     try {
       await sendPasswordResetEmail(auth, cleanEmail);
       setInfoMsg(t('auth_reset_sent'));
     } catch (err) {
+      setErrorCode(extractAuthErrorCode(err));
       setErrorMsg(mapAuthError(err, t));
     } finally {
       setBusy(false);
     }
   };
+
+  const isFirebaseSetupError =
+    errorCode === 'auth/unauthorized-domain' || errorCode === 'auth/operation-not-allowed';
 
   return (
     <div
@@ -133,7 +206,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       aria-label={t('auth_title')}
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#030712]/70 backdrop-blur-md p-4"
     >
-      <div className="holo-glass holo-reticle w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+      <div className="holo-glass holo-reticle w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
           <div>
             <h2 className="font-display text-lg font-bold text-[var(--text)]">
@@ -159,6 +232,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               onClick={() => {
                 setMode('signin');
                 setErrorMsg(null);
+                setErrorCode('');
                 setInfoMsg(null);
               }}
               className={`py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
@@ -174,6 +248,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               onClick={() => {
                 setMode('register');
                 setErrorMsg(null);
+                setErrorCode('');
                 setInfoMsg(null);
               }}
               className={`py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
@@ -223,9 +298,70 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
 
           {errorMsg && (
-            <div className="p-3 rounded-xl border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{errorMsg}</span>
+            <div className="p-3.5 rounded-xl border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-xs text-red-700 dark:text-red-300 space-y-2.5">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{errorMsg}</span>
+              </div>
+
+              {isFirebaseSetupError && (
+                <div className="pt-2 border-t border-red-200 dark:border-red-900/60 space-y-2 text-[11px] text-[var(--text)]">
+                  <div className="font-semibold">
+                    Firebase Project: <code className="font-mono">{firebaseConfig.projectId}</code>
+                  </div>
+                  {errorCode === 'auth/unauthorized-domain' && currentHost && (
+                    <>
+                      <p className="text-[var(--muted)] leading-relaxed">
+                        Firebase Console → Authentication → Settings → Authorized domains:
+                      </p>
+                      <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[var(--surface)] border border-[var(--border)]">
+                        <code className="font-mono text-[10.5px] truncate">{currentHost}</code>
+                        <button
+                          type="button"
+                          onClick={handleCopyDomain}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[var(--border)] bg-[var(--surface-subtle)] hover:border-[#15803D] text-[10.5px] font-semibold shrink-0 cursor-pointer"
+                        >
+                          {copiedHost ? <Check className="w-3 h-3 text-[#15803D]" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedHost ? 'Copied' : 'Copy'}</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {errorCode === 'auth/operation-not-allowed' && (
+                    <div className="space-y-1.5">
+                      <p className="text-[var(--muted)] leading-relaxed">
+                        Enable <strong className="text-[var(--text)]">Email/Password</strong> in Firebase Console → Authentication → Sign-in method, or use Google Sign-In above.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmailProviderDisabled(false);
+                          setErrorMsg(null);
+                          setErrorCode('');
+                          try {
+                            sessionStorage.removeItem('ghad_email_auth_disabled');
+                          } catch {
+                            // Ignore storage failure
+                          }
+                        }}
+                        className="text-[11px] font-semibold text-[#15803D] dark:text-[#4ade80] hover:underline cursor-pointer"
+                      >
+                        I enabled it — try Email again
+                      </button>
+                    </div>
+                  )}
+                  <p className="text-[var(--muted)] leading-relaxed">
+                    All GHAD AI tools and local saving work immediately without signing in.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full py-2 px-3 rounded-lg bg-[var(--surface)] border border-[var(--border)] hover:border-[#15803D] text-xs font-semibold text-[var(--text)] cursor-pointer"
+                  >
+                    Continue Without Signing In
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

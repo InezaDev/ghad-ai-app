@@ -13,17 +13,22 @@ import {
 } from './server/aiService.js';
 import { withApiErrorHandler } from './api/_utils.js';
 import {
+  checkAiMaintenanceMode,
   deleteTeacherFeedback,
   getActivityLogs,
+  getAdminAuthStatus,
   getAnalyticsStats,
   getDeveloperProfile,
   getSiteSettings,
   getTeacherFeedbackList,
+  issueAdminSessionToken,
   recordActivity,
   saveDeveloperProfile,
   saveSiteSettings,
+  setupInitialAdminPassword,
   submitTeacherFeedback,
   verifyAdminPassword,
+  verifyAdminToken,
 } from './server/adminService.js';
 
 dotenv.config();
@@ -53,6 +58,20 @@ async function startServer() {
   app.post(
     '/api/lesson',
     withApiErrorHandler<Request, Response>('/api/lesson', formatErrorResponse, async (req, res) => {
+      const maintenance = await checkAiMaintenanceMode();
+      if (maintenance.blocked) {
+        res.status(503).json({
+          status: 503,
+          code: 'MAINTENANCE_MODE',
+          maintenanceMode: true,
+          title: maintenance.title,
+          message: `${maintenance.title}. ${maintenance.message}`,
+          error: `${maintenance.title}. ${maintenance.message}`,
+          route: '/api/lesson',
+        });
+        return;
+      }
+
       const body = req.body || {};
       const existingPlan =
         body.existingPlan && typeof body.existingPlan === 'object'
@@ -85,7 +104,7 @@ async function startServer() {
         return;
       }
 
-      const plan = await generateRebLessonPlan({
+      const result = await generateRebLessonPlan({
         language: body.language,
         subject,
         classLevel,
@@ -102,17 +121,40 @@ async function startServer() {
         teacherName: body.teacherName,
         extra: body.extra,
         mode: body.mode === 'complete_missing' ? 'complete_missing' : 'generate',
+        confirmOverride: Boolean(body.confirmOverride),
         existingPlan,
       });
 
+      if (result.clarificationRequired) {
+        res.status(200).json({
+          clarificationRequired: true,
+          clarification: result.clarification,
+        });
+        return;
+      }
+
       await recordActivity('lesson', subject, classLevel, body.language || 'en', `Generated lesson plan for ${subject} (${classLevel})`);
-      res.json({ plan });
+      res.json({ plan: result.plan, qualityReport: result.qualityReport });
     })
   );
 
   app.post(
     '/api/assistant',
     withApiErrorHandler<Request, Response>('/api/assistant', formatErrorResponse, async (req, res) => {
+      const maintenance = await checkAiMaintenanceMode();
+      if (maintenance.blocked) {
+        res.status(503).json({
+          status: 503,
+          code: 'MAINTENANCE_MODE',
+          maintenanceMode: true,
+          title: maintenance.title,
+          message: `${maintenance.title}. ${maintenance.message}`,
+          error: `${maintenance.title}. ${maintenance.message}`,
+          route: '/api/assistant',
+        });
+        return;
+      }
+
       const body = req.body || {};
       const message = String(body.message || '').trim();
       if (!message) {
@@ -129,6 +171,7 @@ async function startServer() {
         language: body.language,
         message,
         history: body.history,
+        useWebSearch: body.useWebSearch !== false,
       });
 
       await recordActivity('assistant', 'General', 'All', body.language || 'en', `AI Assistant answered query`);
@@ -139,6 +182,20 @@ async function startServer() {
   app.post(
     '/api/assessment',
     withApiErrorHandler<Request, Response>('/api/assessment', formatErrorResponse, async (req, res) => {
+      const maintenance = await checkAiMaintenanceMode();
+      if (maintenance.blocked) {
+        res.status(503).json({
+          status: 503,
+          code: 'MAINTENANCE_MODE',
+          maintenanceMode: true,
+          title: maintenance.title,
+          message: `${maintenance.title}. ${maintenance.message}`,
+          error: `${maintenance.title}. ${maintenance.message}`,
+          route: '/api/assessment',
+        });
+        return;
+      }
+
       const body = req.body || {};
       const subject = String(body.subject || '').trim();
       const classLevel = String(body.classLevel || body.class || '').trim();
@@ -172,6 +229,20 @@ async function startServer() {
   app.post(
     '/api/methodology',
     withApiErrorHandler<Request, Response>('/api/methodology', formatErrorResponse, async (req, res) => {
+      const maintenance = await checkAiMaintenanceMode();
+      if (maintenance.blocked) {
+        res.status(503).json({
+          status: 503,
+          code: 'MAINTENANCE_MODE',
+          maintenanceMode: true,
+          title: maintenance.title,
+          message: `${maintenance.title}. ${maintenance.message}`,
+          error: `${maintenance.title}. ${maintenance.message}`,
+          route: '/api/methodology',
+        });
+        return;
+      }
+
       const body = req.body || {};
       const subject = String(body.subject || '').trim();
       const classLevel = String(body.classLevel || body.class || '').trim();
@@ -227,20 +298,56 @@ async function startServer() {
   });
 
   // Admin Authentication & Endpoints
-  app.post('/api/admin/auth', (req: Request, res: Response) => {
-    const { password } = req.body || {};
-    if (verifyAdminPassword(password)) {
-      res.json({ success: true, token: process.env.ADMIN_PASSWORD || 'ghad_admin_2026' });
-    } else {
-      res.status(401).json({ error: 'Invalid admin password' });
+  app.get('/api/admin/auth', async (_req: Request, res: Response) => {
+    try {
+      res.json(await getAdminAuthStatus());
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
     }
   });
 
-  const requireAdmin = (req: Request, res: Response, next: () => void) => {
-    const authHeader = req.headers.authorization || (req.headers['x-admin-token'] as string);
-    if (verifyAdminPassword(authHeader)) {
-      next();
-    } else {
+  app.post('/api/admin/auth', async (req: Request, res: Response) => {
+    try {
+      const { action, password } = req.body || {};
+      if (action === 'setup') {
+        const result = await setupInitialAdminPassword(typeof password === 'string' ? password : '');
+        if (!result.ok) {
+          res.status(result.status).json({ error: result.error });
+          return;
+        }
+        res.json({ success: true, token: result.token });
+        return;
+      }
+
+      const authStatus = await getAdminAuthStatus();
+      if (!authStatus.configured) {
+        res.status(403).json({
+          error: 'Administrator password has not been set up yet.',
+          needsSetup: true,
+        });
+        return;
+      }
+
+      if (await verifyAdminPassword(password)) {
+        const token = await issueAdminSessionToken();
+        res.json({ success: true, token });
+      } else {
+        res.status(401).json({ error: 'Invalid admin password' });
+      }
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  const requireAdmin = async (req: Request, res: Response, next: () => void) => {
+    try {
+      const authHeader = req.headers.authorization || (req.headers['x-admin-token'] as string);
+      if (await verifyAdminToken(authHeader)) {
+        next();
+      } else {
+        res.status(401).json({ error: 'Unauthorized: Invalid or missing admin token' });
+      }
+    } catch {
       res.status(401).json({ error: 'Unauthorized: Invalid or missing admin token' });
     }
   };
@@ -286,6 +393,78 @@ async function startServer() {
       server: { middlewareMode: true },
       appType: 'spa',
     });
+
+    const viteDepsDir = path.resolve(__dirname, 'node_modules/.vite/deps');
+    const getActiveBrowserHash = (): string | null => {
+      const envClient = (
+        vite as unknown as {
+          environments?: { client?: { depsOptimizer?: { metadata?: { browserHash?: string } } } };
+        }
+      ).environments?.client;
+      const memHash = envClient?.depsOptimizer?.metadata?.browserHash;
+      if (typeof memHash === 'string' && memHash) return memHash;
+      try {
+        const raw = fs.readFileSync(path.join(viteDepsDir, '_metadata.json'), 'utf8');
+        const parsed = JSON.parse(raw) as { browserHash?: string };
+        return typeof parsed.browserHash === 'string' && parsed.browserHash ? parsed.browserHash : null;
+      } catch {
+        return null;
+      }
+    };
+
+    app.use((req, res, next) => {
+      const reqUrl = req.url || '/';
+      const [pathname, search = ''] = reqUrl.split('?');
+
+      // Guard /node_modules/.vite/deps/* against HTTP 504 (Outdated Optimize Dep),
+      // which reverse proxies rewrite into text/html 504 error pages breaking ES module MIME checks.
+      if (pathname.startsWith('/node_modules/.vite/deps/')) {
+        const relFile = pathname.slice('/node_modules/.vite/deps/'.length);
+        const safeRel = path.posix.normalize(relFile);
+        const targetFile = path.resolve(viteDepsDir, safeRel);
+        const isInsideDeps = targetFile.startsWith(viteDepsDir + path.sep);
+
+        const params = new URLSearchParams(search);
+        const reqVersion = params.get('v');
+        const currentHash = getActiveBrowserHash();
+
+        if (
+          isInsideDeps &&
+          currentHash &&
+          reqVersion &&
+          reqVersion !== currentHash &&
+          fs.existsSync(targetFile)
+        ) {
+          params.set('v', currentHash);
+          res.setHeader('Cache-Control', 'no-store');
+          res.redirect(302, `${pathname}?${params.toString()}`);
+          return;
+        }
+
+        const originalWriteHead = res.writeHead.bind(res) as (
+          statusCode: number,
+          ...args: unknown[]
+        ) => typeof res;
+        res.writeHead = ((statusCode: number, ...args: unknown[]) => {
+          if (statusCode === 504) {
+            const freshHash = getActiveBrowserHash();
+            if (isInsideDeps && freshHash && freshHash !== reqVersion && fs.existsSync(targetFile)) {
+              params.set('v', freshHash);
+              res.setHeader('Cache-Control', 'no-store');
+              res.setHeader('Location', `${pathname}?${params.toString()}`);
+              return originalWriteHead(302, ...args);
+            }
+            res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-store');
+            return originalWriteHead(404, ...args);
+          }
+          return originalWriteHead(statusCode, ...args);
+        }) as typeof res.writeHead;
+      }
+
+      next();
+    });
+
     app.use(vite.middlewares);
   } else {
     const distDir = path.resolve(__dirname, 'dist');

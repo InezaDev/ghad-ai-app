@@ -3,8 +3,55 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+function stripMatchingQuotes(value: string): string {
+  const trimmed = value.trim();
+  if (
+    trimmed.length >= 2 &&
+    ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'")))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+export function sanitizeRedisEnvValue(
+  raw: string | undefined,
+  possiblePrefixes: string[] = []
+): string | undefined {
+  if (!raw || typeof raw !== 'string') return undefined;
+  let val = stripMatchingQuotes(raw);
+  for (const prefix of possiblePrefixes) {
+    const prefixEq = `${prefix}=`;
+    if (val.startsWith(prefixEq)) {
+      val = val.slice(prefixEq.length).trim();
+      break;
+    }
+  }
+  val = stripMatchingQuotes(val);
+  return val || undefined;
+}
+
+export function normalizeRedisRestUrl(raw: string | undefined): string | undefined {
+  const cleaned = sanitizeRedisEnvValue(raw, ['KV_REST_API_URL', 'UPSTASH_REDIS_REST_URL']);
+  if (!cleaned) return undefined;
+  try {
+    const parsed = new URL(cleaned);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      return cleaned;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+const rawUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+const url = normalizeRedisRestUrl(rawUrl);
+const token = sanitizeRedisEnvValue(
+  process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
+  ['KV_REST_API_TOKEN', 'UPSTASH_REDIS_REST_TOKEN']
+);
 
 let redisClient: Redis | null = null;
 const memoryStore = new Map<string, any>();
@@ -19,8 +66,38 @@ if (url && token) {
   } catch (err) {
     console.warn('[GHAD AI KV] Failed to initialize Upstash Redis client, falling back to memory store:', err);
   }
+} else if (rawUrl) {
+  console.warn('[GHAD AI KV] Invalid Redis REST URL format (expected https://...). Falling back to memory store.');
 } else {
   console.log('[GHAD AI KV] Redis environment variables not found. Using in-memory fallback store.');
+}
+
+function isWrongTypeError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err || '');
+  return msg.includes('WRONGTYPE');
+}
+
+async function migrateWrongTypeToList(client: Redis, key: string): Promise<void> {
+  let existingItems: any[] = [];
+  try {
+    const rawVal = await client.get(key);
+    if (Array.isArray(rawVal)) {
+      existingItems = rawVal;
+    } else if (typeof rawVal === 'string') {
+      try {
+        const parsed = JSON.parse(rawVal);
+        if (Array.isArray(parsed)) existingItems = parsed;
+      } catch {
+        // Ignore unparseable legacy string
+      }
+    }
+  } catch {
+    // Ignore read failure prior to key reset
+  }
+  await client.del(key);
+  if (existingItems.length > 0) {
+    await client.rpush(key, ...existingItems.slice(0, 200));
+  }
 }
 
 export const kv = {
@@ -52,7 +129,16 @@ export const kv = {
       try {
         return await redisClient.lpush(key, value);
       } catch (err) {
-        console.warn(`[GHAD AI KV] LPUSH error for key ${key}:`, err);
+        if (isWrongTypeError(err)) {
+          try {
+            await migrateWrongTypeToList(redisClient, key);
+            return await redisClient.lpush(key, value);
+          } catch (retryErr) {
+            console.warn(`[GHAD AI KV] LPUSH recovery error for key ${key}:`, retryErr);
+          }
+        } else {
+          console.warn(`[GHAD AI KV] LPUSH error for key ${key}:`, err);
+        }
       }
     }
     const list = memoryStore.get(key) || [];
@@ -70,7 +156,16 @@ export const kv = {
       try {
         return await redisClient.lrange(key, start, stop);
       } catch (err) {
-        console.warn(`[GHAD AI KV] LRANGE error for key ${key}:`, err);
+        if (isWrongTypeError(err)) {
+          try {
+            await migrateWrongTypeToList(redisClient, key);
+            return await redisClient.lrange(key, start, stop);
+          } catch (retryErr) {
+            console.warn(`[GHAD AI KV] LRANGE recovery error for key ${key}:`, retryErr);
+          }
+        } else {
+          console.warn(`[GHAD AI KV] LRANGE error for key ${key}:`, err);
+        }
       }
     }
     const list = memoryStore.get(key) || [];
@@ -79,12 +174,48 @@ export const kv = {
     return list.slice(start, end);
   },
 
+  async ltrim(key: string, start: number, stop: number): Promise<any> {
+    if (redisClient) {
+      try {
+        return await redisClient.ltrim(key, start, stop);
+      } catch (err) {
+        if (isWrongTypeError(err)) {
+          try {
+            await migrateWrongTypeToList(redisClient, key);
+            return await redisClient.ltrim(key, start, stop);
+          } catch (retryErr) {
+            console.warn(`[GHAD AI KV] LTRIM recovery error for key ${key}:`, retryErr);
+          }
+        } else {
+          console.warn(`[GHAD AI KV] LTRIM error for key ${key}:`, err);
+        }
+      }
+    }
+    const list = memoryStore.get(key) || [];
+    if (!Array.isArray(list)) {
+      memoryStore.set(key, []);
+      return 'OK';
+    }
+    const end = stop === -1 ? list.length : stop + 1;
+    memoryStore.set(key, list.slice(start, end));
+    return 'OK';
+  },
+
   async lrem(key: string, count: number, value: any): Promise<number> {
     if (redisClient) {
       try {
         return await redisClient.lrem(key, count, value);
       } catch (err) {
-        console.warn(`[GHAD AI KV] LREM error for key ${key}:`, err);
+        if (isWrongTypeError(err)) {
+          try {
+            await migrateWrongTypeToList(redisClient, key);
+            return await redisClient.lrem(key, count, value);
+          } catch (retryErr) {
+            console.warn(`[GHAD AI KV] LREM recovery error for key ${key}:`, retryErr);
+          }
+        } else {
+          console.warn(`[GHAD AI KV] LREM error for key ${key}:`, err);
+        }
       }
     }
     const list = memoryStore.get(key) || [];

@@ -24,12 +24,15 @@ import { ChatThread, GraphicsQuality, Lang } from '../types/ghad';
 import { translate } from '../i18n/translations';
 import { useAssistantQueue } from '../hooks/useAssistantQueue';
 import { AiCore3D } from './AiCore3D';
+import { MaintenanceNotice } from './MaintenanceNotice';
 
 interface AssistantViewProps {
   lang: Lang;
   graphicsQuality?: GraphicsQuality;
   threads: ChatThread[];
   activeThreadId: string | null;
+  maintenanceMode?: boolean;
+  onBackHome?: () => void;
   onUpdateThreads: (threads: ChatThread[], nextActiveId: string | null) => void;
   onToast: (msg: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
   onCopy: (text: string) => void;
@@ -144,6 +147,8 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
   graphicsQuality = 'ultra',
   threads,
   activeThreadId,
+  maintenanceMode = false,
+  onBackHome,
   onUpdateThreads,
   onToast,
   onCopy,
@@ -244,6 +249,10 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
   };
 
   const handleSubmit = (overrideText?: string) => {
+    if (maintenanceMode) {
+      onToast('GHAD AI is currently in maintenance mode. AI chat is temporarily paused.', 'warning');
+      return;
+    }
     const text = (overrideText ?? input).trim();
     if (!text) return;
     enqueueMessage(text, { targetThreadId: activeThread?.id ?? null, useWebSearch });
@@ -322,6 +331,10 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
           </button>
         </div>
       </div>
+
+      {maintenanceMode && (
+        <MaintenanceNotice variant="workspace" onReturnHome={onBackHome} />
+      )}
 
       {/* Interactive 3D Holographic AI Core Module */}
       <AiCore3D
@@ -568,8 +581,9 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
                       <button
                         key={prompt}
                         type="button"
+                        disabled={maintenanceMode}
                         onClick={() => handleSubmit(prompt)}
-                        className="text-left text-xs font-medium leading-relaxed px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] hover:border-[#15803D] hover:bg-[#15803D]/5 text-[var(--text)] transition-colors cursor-pointer"
+                        className="text-left text-xs font-medium leading-relaxed px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] hover:border-[#15803D] hover:bg-[#15803D]/5 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text)] transition-colors cursor-pointer"
                       >
                         {prompt}
                       </button>
@@ -803,15 +817,16 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
               id="chatInput"
               type="text"
               value={input}
+              disabled={maintenanceMode}
               onChange={(e) => setInput(e.target.value)}
               data-i18n-ph="chat_ph"
-              placeholder={t('chat_ph')}
-              className="flex-1 min-w-[180px] px-4 min-h-[44px] text-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
+              placeholder={maintenanceMode ? 'Paused for maintenance...' : t('chat_ph')}
+              className="flex-1 min-w-[180px] px-4 min-h-[44px] text-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#15803D]"
             />
             <button
               id="sendChat"
               type="submit"
-              disabled={!input.trim()}
+              disabled={!input.trim() || maintenanceMode}
               className="inline-flex items-center gap-1.5 px-4 min-h-[44px] text-sm font-semibold rounded-xl bg-[#15803D] hover:bg-[#166534] disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors cursor-pointer whitespace-nowrap shadow-xs"
             >
               <Send className="w-4 h-4" />

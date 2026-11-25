@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { User } from 'firebase/auth';
 import {
   ArrowRight,
@@ -8,17 +8,22 @@ import {
   ClipboardCheck,
   Compass,
   FileText,
+  Loader2,
   LogIn,
   LogOut,
+  Megaphone,
   MessageSquare,
   Printer,
+  Send,
   Sparkles,
   WifiOff,
+  X,
   Zap,
 } from 'lucide-react';
-import { GraphicsQuality, Lang, ViewName } from '../types/ghad';
+import { DeveloperProfile, GraphicsQuality, Lang, SiteSettings, ViewName } from '../types/ghad';
 import { translate } from '../i18n/translations';
 import { HeroScene3D } from './HeroScene3D';
+import { MaintenanceNotice } from './MaintenanceNotice';
 
 const QUICK_CLASSES = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6'];
 const QUICK_SUBJECTS = [
@@ -35,6 +40,7 @@ const QUICK_SUBJECTS = [
   'Science & Elementary Technology (SET)',
   'ICT / Computer Science',
   'Entrepreneurship',
+  'Economics',
 ];
 
 const SUBJECT_SAMPLE_MAP: Record<string, { unit: string; title: string; intro: string; dev: string }> = {
@@ -58,26 +64,53 @@ const SUBJECT_SAMPLE_MAP: Record<string, { unit: string; title: string; intro: s
   },
 };
 
+const DEFAULT_SITE_SETTINGS: SiteSettings = {
+  bannerText: '',
+  bannerActive: false,
+  maintenanceMode: false,
+  toolLesson: true,
+  toolAssistant: true,
+  toolAssessment: true,
+  toolMethodology: true,
+};
+
+const DEFAULT_DEVELOPER: DeveloperProfile = {
+  name: 'Nkurikiyineza Ghad',
+  title: 'Student-Teacher | Social Studies Education | Creator of GHAD AI',
+  school: 'TTC Muhanga',
+  bio: 'I am a passionate Year 3 student at TTC Muhanga, pursuing Social Studies Education (SSE), with a strong interest in teaching, educational innovation, and technology.\n\nAs the creator of GHAD AI, I am committed to transforming education through digital solutions that help teachers simplify lesson planning, competence-based curriculum documentation, quizzes, and teaching resources in English, Kinyarwanda, French, and Kiswahili.\n\nMy interests include curriculum development, learner-centred teaching, educational research, assessment, and digital learning.\n\nI am open to job opportunities, internships, educational projects, volunteering, and professional collaborations where I can apply my skills, gain experience, and make a positive contribution.\n\nMy mission: Empowering educators, inspiring learners, and transforming education through innovation.',
+  photoUrl: '',
+  phone: '+250 783262573',
+  email: 'inezaghad250@gmail.com',
+  github: '',
+};
+
 interface LandingPageProps {
   lang: Lang;
   graphicsQuality?: GraphicsQuality;
   user: User | null;
+  siteSettings?: SiteSettings;
+  developer?: DeveloperProfile;
   onChangeLang: (lang: Lang) => void;
   onLaunch: (view: ViewName) => void;
   onQuickLaunchLesson?: (prefill: { subject: string; classLevel: string }) => void;
   onOpenAuth: (mode?: 'signin' | 'register') => void;
   onSignOut: () => void;
+  onToast?: (msg: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   lang,
   graphicsQuality = 'ultra',
   user,
+  siteSettings: propSiteSettings,
+  developer: propDeveloper,
   onChangeLang,
   onLaunch,
   onQuickLaunchLesson,
   onOpenAuth,
   onSignOut,
+  onToast,
 }) => {
   const t = (k: string) => translate(lang, k);
   const year = new Date().getFullYear();
@@ -85,27 +118,31 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [quickClass, setQuickClass] = useState('P4');
   const [quickSubject, setQuickSubject] = useState('Social and Religious Education (SRE)');
   const [heroShowcaseTab, setHeroShowcaseTab] = useState<'3d' | 'sheet'>('3d');
-  const [developer, setDeveloper] = useState({
-    name: 'Nkurikiyineza Ghad',
-    title: 'Creator of GHAD AI · Educator & EdTech Developer in Rwanda',
-    school: 'G.S. Saint Etienne',
-    bio: 'GHAD AI is built for Rwandan educators to simplify competence-based curriculum paperwork, lesson planning, quizzes, and teaching guides in English, Kinyarwanda, French, and Kiswahili.',
-    photoUrl: '',
-    phone: '+250 788 123 456',
-    email: 'nkurikiyineza@ghadai.rw',
-    github: '',
-  });
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/settings')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && data.developer) {
-          setDeveloper(data.developer);
-        }
-      })
-      .catch(() => {});
-  }, []);
+  const [fbName, setFbName] = useState('');
+  const [fbEmail, setFbEmail] = useState('');
+  const [fbMessage, setFbMessage] = useState('');
+  const [fbSubmitting, setFbSubmitting] = useState(false);
+  const [fbStatus, setFbStatus] = useState<{ type: 'success' | 'error'; key?: string; text?: string } | null>(null);
+
+  const siteSettings = propSiteSettings ?? DEFAULT_SITE_SETTINGS;
+  const developer = propDeveloper ?? DEFAULT_DEVELOPER;
+
+  const normalizeText = (s: string) => s.replace(/\s+/g, ' ').trim();
+  const isDefaultTitle =
+    !developer.title?.trim() ||
+    normalizeText(developer.title) === normalizeText(DEFAULT_DEVELOPER.title);
+  const isDefaultBio =
+    !developer.bio?.trim() ||
+    normalizeText(developer.bio) === normalizeText(DEFAULT_DEVELOPER.bio);
+
+  const resolvedDeveloperTitle =
+    developer.localizedTitles?.[lang]?.trim() ||
+    (isDefaultTitle ? t('dev_default_title') : developer.title);
+  const resolvedDeveloperBio =
+    developer.localizedBios?.[lang]?.trim() ||
+    (isDefaultBio ? t('dev_default_bio') : developer.bio);
 
   const samplePreview = SUBJECT_SAMPLE_MAP[quickSubject] || {
     unit: `Unit 1 · ${quickSubject}`,
@@ -116,6 +153,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   const handleQuickTry = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!siteSettings.toolLesson) {
+      onToast?.(t('paused_by_admin'), 'warning');
+      return;
+    }
     if (onQuickLaunchLesson) {
       onQuickLaunchLesson({ subject: quickSubject, classLevel: quickClass });
     } else {
@@ -123,8 +164,76 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   };
 
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedMsg = fbMessage.trim();
+    if (!trimmedMsg) {
+      setFbStatus({ type: 'error', key: 'fb_err_empty' });
+      return;
+    }
+    if (fbEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fbEmail.trim())) {
+      setFbStatus({ type: 'error', key: 'fb_err_email' });
+      return;
+    }
+
+    setFbSubmitting(true);
+    setFbStatus(null);
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: fbName.trim(),
+          email: fbEmail.trim(),
+          message: trimmedMsg,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || t('fb_err_fail'));
+      }
+      setFbName('');
+      setFbEmail('');
+      setFbMessage('');
+      setFbStatus({ type: 'success', key: 'fb_success' });
+      onToast?.(t('fb_toast_sent'), 'success');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t('fb_err_fail');
+      setFbStatus({ type: 'error', text: msg });
+      onToast?.(msg, 'error');
+    } finally {
+      setFbSubmitting(false);
+    }
+  };
+
   return (
     <div id="landingPage" className="relative z-10 min-h-screen bg-transparent text-[var(--text)]">
+      {/* Live Admin Announcement & Maintenance Banners */}
+      {siteSettings.bannerActive && siteSettings.bannerText.trim() && !bannerDismissed && (
+        <div className="bg-gradient-to-r from-[#15803D] via-[#059669] to-[#0284C7] text-white text-xs sm:text-sm font-medium px-4 py-2">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Megaphone className="w-4 h-4 shrink-0" />
+              <span className="truncate sm:whitespace-normal">{siteSettings.bannerText}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBannerDismissed(true)}
+              aria-label="Dismiss announcement"
+              className="p-1 rounded hover:bg-white/15 shrink-0 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {siteSettings.maintenanceMode && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
+          <MaintenanceNotice variant="homepage" />
+        </div>
+      )}
+
       {/* Top Bar Contract: Brand wordmark — 4 concise nav links — Primary action */}
       <header className="holo-glass border-b border-[#38bdf8]/25 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-8">
@@ -549,11 +658,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <button
               type="button"
               onClick={() => onLaunch('lesson')}
-              className="holo-glass holo-reticle card-3d-tilt lg:col-span-7 text-left p-6 rounded-2xl border border-[#38bdf8]/25 hover:border-[#10b981] flex flex-col justify-between gap-5 cursor-pointer"
+              className={`holo-glass holo-reticle card-3d-tilt lg:col-span-7 text-left p-6 rounded-2xl border border-[#38bdf8]/25 hover:border-[#10b981] flex flex-col justify-between gap-5 cursor-pointer ${
+                !siteSettings.toolLesson ? 'opacity-65' : ''
+              }`}
             >
               <div className="space-y-3">
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#15803D] to-[#0284C7] text-white grid place-items-center">
-                  <BookOpen className="w-5 h-5" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#15803D] to-[#0284C7] text-white grid place-items-center">
+                    <BookOpen className="w-5 h-5" />
+                  </div>
+                  {!siteSettings.toolLesson && (
+                    <span className="text-[11px] font-semibold text-amber-500">{t('paused_by_admin')}</span>
+                  )}
                 </div>
                 <h3 data-i18n="tool_lesson_t" className="font-display text-lg font-bold text-[var(--text)]">
                   {t('tool_lesson_t')}
@@ -583,11 +699,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <button
               type="button"
               onClick={() => onLaunch('assistant')}
-              className="holo-glass holo-reticle card-3d-tilt lg:col-span-5 text-left p-6 rounded-2xl border border-[#38bdf8]/25 hover:border-[#38bdf8] flex flex-col justify-between gap-5 cursor-pointer"
+              className={`holo-glass holo-reticle card-3d-tilt lg:col-span-5 text-left p-6 rounded-2xl border border-[#38bdf8]/25 hover:border-[#38bdf8] flex flex-col justify-between gap-5 cursor-pointer ${
+                !siteSettings.toolAssistant ? 'opacity-65' : ''
+              }`}
             >
               <div className="space-y-3">
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#0284C7] to-[#15803D] text-white grid place-items-center">
-                  <MessageSquare className="w-5 h-5" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#0284C7] to-[#15803D] text-white grid place-items-center">
+                    <MessageSquare className="w-5 h-5" />
+                  </div>
+                  {!siteSettings.toolAssistant && (
+                    <span className="text-[11px] font-semibold text-amber-500">{t('paused_by_admin')}</span>
+                  )}
                 </div>
                 <h3 data-i18n="tool_ai_t" className="font-display text-lg font-bold text-[var(--text)]">
                   {t('tool_ai_t')}
@@ -609,11 +732,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <button
               type="button"
               onClick={() => onLaunch('assessment')}
-              className="holo-glass holo-reticle card-3d-tilt lg:col-span-6 text-left p-6 rounded-2xl border border-[#38bdf8]/25 hover:border-[#f59e0b] flex flex-col justify-between gap-5 cursor-pointer"
+              className={`holo-glass holo-reticle card-3d-tilt lg:col-span-6 text-left p-6 rounded-2xl border border-[#38bdf8]/25 hover:border-[#f59e0b] flex flex-col justify-between gap-5 cursor-pointer ${
+                !siteSettings.toolAssessment ? 'opacity-65' : ''
+              }`}
             >
               <div className="space-y-3">
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white grid place-items-center">
-                  <ClipboardCheck className="w-5 h-5" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white grid place-items-center">
+                    <ClipboardCheck className="w-5 h-5" />
+                  </div>
+                  {!siteSettings.toolAssessment && (
+                    <span className="text-[11px] font-semibold text-amber-500">{t('paused_by_admin')}</span>
+                  )}
                 </div>
                 <h3 data-i18n="tool_assess_t" className="font-display text-lg font-bold text-[var(--text)]">
                   {t('tool_assess_t')}
@@ -622,7 +752,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   {t('tool_assess_d')}
                 </p>
                 <div className="p-3 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--muted)] flex items-center justify-between gap-2">
-                  <span>Q1. Compare equity &amp; equality [4 pts]</span>
+                  <span>1. Compare equity &amp; equality (4 marks)</span>
                   <span className="font-semibold text-[#15803D] dark:text-[#4ADE80]">{t('bento_marking_key')}</span>
                 </div>
               </div>
@@ -636,11 +766,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <button
               type="button"
               onClick={() => onLaunch('methodology')}
-              className="holo-glass holo-reticle card-3d-tilt lg:col-span-6 text-left p-6 rounded-2xl border border-[#38bdf8]/25 hover:border-[#10b981] flex flex-col justify-between gap-5 cursor-pointer"
+              className={`holo-glass holo-reticle card-3d-tilt lg:col-span-6 text-left p-6 rounded-2xl border border-[#38bdf8]/25 hover:border-[#10b981] flex flex-col justify-between gap-5 cursor-pointer ${
+                !siteSettings.toolMethodology ? 'opacity-65' : ''
+              }`}
             >
               <div className="space-y-3">
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#15803D] to-[#F59E0B] text-white grid place-items-center">
-                  <Compass className="w-5 h-5" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#15803D] to-[#F59E0B] text-white grid place-items-center">
+                    <Compass className="w-5 h-5" />
+                  </div>
+                  {!siteSettings.toolMethodology && (
+                    <span className="text-[11px] font-semibold text-amber-500">{t('paused_by_admin')}</span>
+                  )}
                 </div>
                 <h3 data-i18n="tool_method_t" className="font-display text-lg font-bold text-[var(--text)]">
                   {t('tool_method_t')}
@@ -726,16 +863,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
           <div className="space-y-3 text-center md:text-left flex-1">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#10b981]/15 text-[#10b981] text-xs font-semibold">
-              <span>🇷🇼 {developer.school || 'G.S. Saint Etienne'}</span>
+              <span>📍 {t('dev_location_country')} | {developer.school || 'TTC Muhanga'}</span>
             </div>
             <h2 className="font-display text-2xl sm:text-3xl font-bold text-[var(--text)]">
-              {developer.name || 'Nkurikiyineza Ghad'}
+              🇷🇼 {developer.name || 'Nkurikiyineza Ghad'}
             </h2>
-            <p className="text-sm font-semibold text-[#0284c7] dark:text-[#38bdf8]">
-              {developer.title || 'Creator of GHAD AI · Educator & EdTech Developer in Rwanda'}
+            <p className="text-sm font-semibold text-[#0284C7] dark:text-[#38bdf8]">
+              {resolvedDeveloperTitle}
             </p>
-            <p className="text-sm text-[var(--muted)] leading-relaxed max-w-2xl">
-              {developer.bio}
+            <p className="text-sm text-[var(--muted)] leading-relaxed max-w-2xl whitespace-pre-line">
+              {resolvedDeveloperBio}
             </p>
 
             {/* Contact buttons (only shown if filled in) */}
@@ -748,13 +885,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition shadow-sm"
                   >
-                    <span>💬 WhatsApp</span>
+                    <span>💬 {t('dev_btn_whatsapp')}</span>
                   </a>
                   <a
                     href={`tel:${developer.phone}`}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-[var(--text)] text-xs font-semibold hover:border-[#10b981] transition shadow-sm"
                   >
-                    <span>📞 Call {developer.phone}</span>
+                    <span>📞 {t('dev_btn_call')} {developer.phone}</span>
                   </a>
                 </>
               )}
@@ -773,7 +910,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-[var(--text)] text-xs font-semibold hover:border-[#10b981] transition shadow-sm"
                 >
-                  <span>🌐 Website / GitHub</span>
+                  <span>🌐 {t('dev_btn_website')}</span>
                 </a>
               )}
             </div>
@@ -781,15 +918,91 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="holo-glass border-t border-[#38bdf8]/20 py-8 px-6 text-center text-sm text-[var(--muted)]">
-        <p className="font-medium text-[var(--text)]">
-          GHAD AI — <span data-i18n="footer_line">{t('footer_line')}</span>
-        </p>
-        <p className="mt-1">
-          © <span id="footerYear">{year}</span> GHAD AI ·{' '}
-          <span data-i18n="footer_rights">{t('footer_rights')}</span>
-        </p>
+      {/* Footer with Teacher Feedback Form */}
+      <footer className="holo-glass border-t border-[#38bdf8]/20 py-10 px-4 sm:px-6 text-sm text-[var(--muted)]">
+        <div className="max-w-5xl mx-auto space-y-8">
+          <form
+            id="teacherFeedbackForm"
+            onSubmit={handleFeedbackSubmit}
+            className="holo-glass holo-reticle p-5 sm:p-6 rounded-2xl border border-[#38bdf8]/25 text-left space-y-4"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="font-display text-base font-bold text-[var(--text)]">
+                  {t('fb_title')}
+                </h3>
+                <p className="text-xs text-[var(--muted)] mt-0.5">
+                  {t('fb_sub')}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="text"
+                value={fbName}
+                onChange={(e) => setFbName(e.target.value)}
+                disabled={fbSubmitting}
+                placeholder={t('fb_ph_name')}
+                aria-label={t('fb_ph_name')}
+                className="px-3.5 py-2 text-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
+              />
+              <input
+                type="email"
+                value={fbEmail}
+                onChange={(e) => setFbEmail(e.target.value)}
+                disabled={fbSubmitting}
+                placeholder={t('fb_ph_email')}
+                aria-label={t('fb_ph_email')}
+                className="px-3.5 py-2 text-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
+              />
+            </div>
+
+            <textarea
+              rows={2}
+              value={fbMessage}
+              onChange={(e) => setFbMessage(e.target.value)}
+              disabled={fbSubmitting}
+              placeholder={t('fb_ph_message')}
+              aria-label={t('fb_ph_message')}
+              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[#15803D]"
+            />
+
+            {fbStatus && (
+              <p
+                role="status"
+                className={`text-xs font-medium ${
+                  fbStatus.type === 'success'
+                    ? 'text-[#15803D] dark:text-[#4ADE80]'
+                    : 'text-red-600 dark:text-red-400'
+                }`}
+              >
+                {fbStatus.key ? t(fbStatus.key) : fbStatus.text}
+              </p>
+            )}
+
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={fbSubmitting}
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-[#15803D] hover:bg-[#166534] disabled:opacity-60 rounded-xl transition-colors cursor-pointer"
+              >
+                {fbSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                <span>{fbSubmitting ? t('fb_sending') : t('fb_send')}</span>
+              </button>
+            </div>
+          </form>
+
+          <div className="text-center">
+            <p className="font-medium text-[var(--text)]">
+              GHAD AI — <span data-i18n="footer_line">{t('footer_line')}</span>
+            </p>
+            <p className="mt-1">
+              © <span id="footerYear">{year}</span> GHAD AI ·{' '}
+              <span data-i18n="footer_rights">{t('footer_rights')}</span>
+            </p>
+          </div>
+        </div>
       </footer>
     </div>
   );

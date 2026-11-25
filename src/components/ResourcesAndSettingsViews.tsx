@@ -392,14 +392,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
           {onOpenAdmin && (
             <div className="holo-glass holo-reticle p-6 rounded-2xl border border-[var(--primary)]/30 space-y-3">
-              <h2 className="font-display text-base font-bold text-[var(--text)]">Admin Portal & Redis KV</h2>
-              <p className="text-xs text-[var(--muted)]">Manage site settings, usage analytics, activity logs, feedback inbox, and developer profile.</p>
+              <h2 className="font-display text-base font-bold text-[var(--text)]">{t('set_admin_title')}</h2>
+              <p className="text-xs text-[var(--muted)]">{t('set_admin_desc')}</p>
               <button
                 type="button"
                 onClick={onOpenAdmin}
                 className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl bg-[var(--primary)] text-white hover:opacity-95 transition cursor-pointer"
               >
-                <span>Open Admin Dashboard</span>
+                <span>{t('set_admin_btn')}</span>
               </button>
             </div>
           )}

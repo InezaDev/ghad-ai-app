@@ -33,6 +33,23 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        'react-dom/client',
+        'react/jsx-runtime',
+        'react/jsx-dev-runtime',
+        'firebase/app',
+        'firebase/auth',
+        'firebase/firestore',
+        'lucide-react',
+        'react-markdown',
+        'remark-gfm',
+        'three',
+        'three/addons/environments/RoomEnvironment.js',
+      ],
+    },
     server: {
       host: '0.0.0.0',
       port: 3000,

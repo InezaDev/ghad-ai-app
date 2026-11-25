@@ -23,10 +23,12 @@ import {
   assessmentToWordHtml,
   downloadWordDoc,
   formatQuestionMarks,
+  groupAssessmentQuestions,
   isEmbeddedSandbox,
   printOrDownloadHtml,
 } from '../utils/export';
 import { AiClientError, requestAssessment } from '../services/aiClient';
+import { MaintenanceNotice } from './MaintenanceNotice';
 
 const RWANDA_CLASSES = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6'];
 
@@ -41,6 +43,8 @@ interface AssessmentViewProps {
   lang: Lang;
   history: SavedAssessment[];
   prefill?: AssessmentPrefill | null;
+  maintenanceMode?: boolean;
+  onBackHome?: () => void;
   onSaveHistory: (next: SavedAssessment[]) => void;
   onToast: (msg: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
   onCopy: (text: string) => void;
@@ -50,6 +54,8 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
   lang,
   history,
   prefill,
+  maintenanceMode = false,
+  onBackHome,
   onSaveHistory,
   onToast,
   onCopy,
@@ -104,6 +110,12 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
   };
 
   const handleGenerate = async () => {
+    if (maintenanceMode) {
+      const msg = 'GHAD AI is currently in maintenance mode. Generating new assessments is temporarily paused.';
+      setErrorMsg(msg);
+      onToast(msg, 'warning');
+      return;
+    }
     if (!subject.trim() || !classLevel.trim() || !topic.trim()) {
       const msg = t('toast_fill');
       setErrorMsg(msg);
@@ -204,7 +216,11 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
       title: `${target.data.title || 'REB CBC Assessment'} (${
         includeAnswers ? t('print_teacher_key') : t('print_student_copy')
       })`,
-      innerHtml: assessmentToWordHtml(target.data, includeAnswers, lang),
+      innerHtml: assessmentToWordHtml(target.data, includeAnswers, lang, {
+        subject: target.subject,
+        classLevel: target.classLevel,
+        assessmentType: target.assessmentType,
+      }),
       onNotify: onToast,
     });
     if (isEmbeddedSandbox()) {
@@ -220,6 +236,10 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
     ? '__OTHER__'
     : '';
 
+  const groupedActive = active?.data
+    ? groupAssessmentQuestions(active.data, active.assessmentType, lang)
+    : null;
+
   return (
     <section id="view-assessment" className="view-animate space-y-6">
       <div className="no-print">
@@ -230,6 +250,10 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
           {t('assess_sub')}
         </p>
       </div>
+
+      {maintenanceMode && (
+        <MaintenanceNotice variant="workspace" onReturnHome={onBackHome} />
+      )}
 
       <form
         id="assessmentForm"
@@ -358,7 +382,7 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
           <button
             id="generateAssessment"
             type="submit"
-            disabled={loading}
+            disabled={loading || maintenanceMode}
             className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-[#15803D] hover:bg-[#166534] disabled:opacity-60 disabled:cursor-not-allowed rounded-xl transition-colors cursor-pointer whitespace-nowrap"
           >
             {loading ? (
@@ -476,7 +500,15 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
               <button
                 id="copyAssessment"
                 type="button"
-                onClick={() => onCopy(assessmentToPlainText(active.data, showAnswers, lang))}
+                onClick={() =>
+                  onCopy(
+                    assessmentToPlainText(active.data, showAnswers, lang, {
+                      subject: active.subject,
+                      classLevel: active.classLevel,
+                      assessmentType: active.assessmentType,
+                    })
+                  )
+                }
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[#15803D] transition-colors cursor-pointer whitespace-nowrap"
               >
                 <Copy className="w-3.5 h-3.5" />
@@ -488,7 +520,11 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                   downloadWordDoc(
                     `Assessment_${active.subject}_${active.classLevel}`.replace(/[^a-zA-Z0-9_-]+/g, '_'),
                     active.data.title,
-                    assessmentToWordHtml(active.data, showAnswers, lang)
+                    assessmentToWordHtml(active.data, showAnswers, lang, {
+                      subject: active.subject,
+                      classLevel: active.classLevel,
+                      assessmentType: active.assessmentType,
+                    })
                   )
                 }
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[#15803D] transition-colors cursor-pointer whitespace-nowrap"
@@ -500,50 +536,107 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
           </div>
 
           <div id="assessmentBody" className="p-6 space-y-6">
-            <div className="border-b border-[var(--border)] pb-4">
-              <h2 className="font-display text-xl font-bold text-[var(--text)]">
-                {active.data.title}
-              </h2>
-              <div className="mt-1.5 text-xs text-[var(--muted)] flex flex-wrap items-center gap-2">
-                <span>{active.subject}</span>
-                <span aria-hidden="true">·</span>
-                <span>{active.classLevel}</span>
-                <span aria-hidden="true">·</span>
-                <span className="font-mono-tabular font-semibold">
-                  {t('assess_total_marks')}: {active.data.totalMarks}
-                </span>
+            <div className="border-2 border-[var(--border)] p-5 rounded-2xl bg-[var(--surface-subtle)] space-y-3">
+              <div className="text-center">
+                <p className="font-display font-bold text-xs uppercase tracking-wider text-[var(--muted)]">Republic of Rwanda · Ministry of Education</p>
+                <h2 className="font-display text-xl sm:text-2xl font-bold text-[var(--text)] mt-1">
+                  {active.data.title}
+                </h2>
               </div>
-              <p className="mt-3 text-sm text-[var(--text)]">
-                <strong>{t('assess_instructions')}:</strong> {active.data.instructions}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-xs font-semibold text-[var(--text)] pt-3 border-t border-[var(--border)]">
+                <div className="flex items-center gap-2">
+                  <span className="text-[var(--muted)]">School Name:</span>
+                  <span className="border-b border-dotted border-[var(--text)] flex-1">&nbsp;</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[var(--muted)]">Class / Level:</span>
+                  <span className="border-b border-dotted border-[var(--text)] flex-1">{active.classLevel}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[var(--muted)]">Pupil&apos;s Name:</span>
+                  <span className="border-b border-dotted border-[var(--text)] flex-1">&nbsp;</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[var(--muted)]">Date:</span>
+                  <span className="border-b border-dotted border-[var(--text)] flex-1">&nbsp;</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[var(--muted)]">Subject:</span>
+                  <span className="border-b border-dotted border-[var(--text)] flex-1">{active.subject || '—'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[var(--muted)]">Total Marks:</span>
+                  <span className="border-b border-dotted border-[var(--text)] flex-1">... / {active.data.totalMarks}</span>
+                </div>
+              </div>
+              <p className="text-xs text-[var(--muted)] pt-1">
+                <strong>Instructions:</strong> {active.data.instructions}
               </p>
             </div>
 
-            <div className="space-y-5">
-              {(active.data.questions ?? []).map((q) => (
-                <div key={q.number} className="space-y-2">
-                  <div className="flex items-start justify-between gap-4">
-                    <p className="text-sm font-medium text-[var(--text)] whitespace-pre-wrap leading-relaxed">
-                      <span className="font-mono-tabular font-bold mr-1.5">{q.number}.</span>
-                      {q.question}
-                    </p>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {q.type && (
-                        <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-[var(--surface-subtle)] border border-[var(--border)] text-[var(--muted)]">
-                          {t(`type_${q.type}`) !== `type_${q.type}` ? t(`type_${q.type}`) : q.type}
-                        </span>
-                      )}
-                      <span className="font-mono-tabular text-xs font-semibold text-[var(--muted)]">
-                        ({formatQuestionMarks(q.marks, lang)})
-                      </span>
-                    </div>
-                  </div>
-                  {(q.options ?? []).length > 0 && (
-                    <ul className="pl-6 space-y-1 text-sm text-[var(--text)]">
-                      {(q.options ?? []).map((opt, idx) => (
-                        <li key={idx}>{opt}</li>
-                      ))}
-                    </ul>
+            <div className="space-y-6">
+              {(groupedActive?.sections ?? []).map((sec, secIdx) => (
+                <div key={sec.title ?? `sec_${secIdx}`} className="space-y-5">
+                  {sec.title && (
+                    <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[var(--text)] pb-1.5 border-b border-[var(--border)]">
+                      {sec.title}
+                    </h3>
                   )}
+                  {sec.questions.map((q) => {
+                    const isMatching = q.type === 'matching';
+                    const isShortOrOpen = q.type === 'short' || q.type === 'open_ended';
+                    const linesCount = (Number(q.marks) || 1) >= 3 ? 4 : 2;
+
+                    return (
+                      <div
+                        key={q.displayNumber}
+                        className="assessment-question-block space-y-2.5 pb-3 border-b border-[var(--border)]/40 last:border-0"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <p className="text-sm font-medium text-[var(--text)] whitespace-pre-wrap leading-relaxed">
+                            <span className="font-mono-tabular font-bold mr-1.5">{q.displayNumber}.</span>
+                            {q.question}
+                          </p>
+                          <div className="shrink-0">
+                            <span className="font-mono-tabular text-xs font-semibold text-[var(--muted)]">
+                              ({formatQuestionMarks(q.marks, lang)})
+                            </span>
+                          </div>
+                        </div>
+
+                        {(q.options ?? []).length > 0 && (
+                          <ul
+                            className={
+                              isMatching
+                                ? 'grid grid-cols-1 sm:grid-cols-2 gap-2 pl-4 pt-1'
+                                : 'pl-6 space-y-1.5 text-sm text-[var(--text)]'
+                            }
+                          >
+                            {(q.options ?? []).map((opt, idx) => (
+                              <li
+                                key={idx}
+                                className={
+                                  isMatching
+                                    ? 'p-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs font-medium'
+                                    : ''
+                                }
+                              >
+                                {opt}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        {isShortOrOpen && (
+                          <div className="mt-3 space-y-2 select-none">
+                            {Array.from({ length: linesCount }).map((_, i) => (
+                              <div key={i} className="border-b border-dotted border-[var(--border)] h-5 w-full" />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
             </div>
@@ -566,10 +659,10 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                       </tr>
                     </thead>
                     <tbody>
-                      {(active.data.questions ?? []).map((q) => (
-                        <tr key={q.number}>
+                      {(groupedActive?.orderedQuestions ?? []).map((q) => (
+                        <tr key={q.displayNumber}>
                           <td className="border border-[var(--border)] px-3 py-2 font-mono-tabular">
-                            {q.number}
+                            {q.displayNumber}
                           </td>
                           <td className="border border-[var(--border)] px-3 py-2 font-medium whitespace-pre-wrap">
                             {q.answer}
@@ -636,7 +729,15 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onCopy(assessmentToPlainText(item.data, true, lang))}
+                    onClick={() =>
+                      onCopy(
+                        assessmentToPlainText(item.data, true, lang, {
+                          subject: item.subject,
+                          classLevel: item.classLevel,
+                          assessmentType: item.assessmentType,
+                        })
+                      )
+                    }
                     className="p-1.5 text-[var(--muted)] hover:text-[var(--text)] cursor-pointer"
                     title={t('copy_short')}
                   >

@@ -2,7 +2,9 @@ import {
   AssessmentData,
   GroundingSource,
   Lang,
+  LessonClarification,
   LessonPlanData,
+  LessonQualityReport,
   MethodologyData,
 } from '../types/ghad';
 
@@ -10,11 +12,19 @@ export class AiClientError extends Error {
   status: number;
   isAborted: boolean;
   isHighDemand: boolean;
-  constructor(message: string, status = 500, opts?: { isAborted?: boolean; isHighDemand?: boolean }) {
+  isMaintenance: boolean;
+  constructor(
+    message: string,
+    status = 500,
+    opts?: { isAborted?: boolean; isHighDemand?: boolean; isMaintenance?: boolean }
+  ) {
     super(message);
     this.status = status;
     this.isAborted = Boolean(opts?.isAborted);
-    this.isHighDemand = opts?.isHighDemand ?? (status === 503 || status === 429);
+    this.isMaintenance = Boolean(opts?.isMaintenance);
+    this.isHighDemand = opts?.isMaintenance
+      ? false
+      : opts?.isHighDemand ?? (status === 503 || status === 429);
   }
 }
 
@@ -38,6 +48,7 @@ async function postJson<T>(
       details?: string;
       status?: number;
       code?: string;
+      maintenanceMode?: boolean;
     }) | null = null;
     if (rawText) {
       try {
@@ -47,6 +58,7 @@ async function postJson<T>(
           details?: string;
           status?: number;
           code?: string;
+          maintenanceMode?: boolean;
         };
       } catch {
         data = null;
@@ -61,13 +73,15 @@ async function postJson<T>(
         `Request failed (${response.status})`;
       const detail =
         data?.details || (data?.error && data.error !== baseMsg ? data.error : undefined);
-      const isHighDemand = response.status === 503 || response.status === 429;
+      const isMaintenance = Boolean(data?.maintenanceMode || data?.code === 'MAINTENANCE_MODE');
+      const isHighDemand = !isMaintenance && (response.status === 503 || response.status === 429);
       if (detail && detail !== baseMsg) {
         console.warn(`[GHAD AI] ${url} (${response.status}):`, detail);
       }
-      const msg = !isHighDemand && detail && detail !== baseMsg ? `${baseMsg} (${detail})` : baseMsg;
+      const msg = !isHighDemand && !isMaintenance && detail && detail !== baseMsg ? `${baseMsg} (${detail})` : baseMsg;
       throw new AiClientError(msg, response.status, {
         isHighDemand,
+        isMaintenance,
       });
     }
 
@@ -126,17 +140,34 @@ export interface LessonRequestParams {
   teacherName: string;
   extra: string;
   mode?: 'generate' | 'complete_missing';
+  confirmOverride?: boolean;
   existingPlan?: Partial<LessonPlanData>;
   signal?: AbortSignal;
 }
 
-export async function requestLessonPlan(params: LessonRequestParams): Promise<LessonPlanData> {
+export type LessonPlanApiResult =
+  | {
+      clarificationRequired: true;
+      clarification: LessonClarification;
+    }
+  | {
+      clarificationRequired: false;
+      plan: LessonPlanData;
+      qualityReport?: LessonQualityReport;
+    };
+
+export async function requestLessonPlan(params: LessonRequestParams): Promise<LessonPlanApiResult> {
   return enqueueAiRequest(async () => {
     if (params.signal?.aborted) {
       throw new AiClientError('Request cancelled.', 499, { isAborted: true });
     }
 
-    const data = await postJson<{ plan?: LessonPlanData }>(
+    const data = await postJson<{
+      clarificationRequired?: boolean;
+      clarification?: LessonClarification;
+      plan?: LessonPlanData;
+      qualityReport?: LessonQualityReport;
+    }>(
       '/api/lesson',
       {
         language: params.lang,
@@ -155,21 +186,33 @@ export async function requestLessonPlan(params: LessonRequestParams): Promise<Le
         teacherName: params.teacherName,
         extra: params.extra,
         mode: params.mode,
+        confirmOverride: params.confirmOverride,
         existingPlan: params.existingPlan,
       },
       params.signal
     );
+
+    if (data?.clarificationRequired && data.clarification) {
+      return {
+        clarificationRequired: true,
+        clarification: data.clarification,
+      };
+    }
 
     if (!data?.plan) {
       throw new AiClientError('Server returned an empty lesson plan.', 502);
     }
     const p = data.plan;
     return {
-      ...p,
-      stages: (Array.isArray(p.stages) ? p.stages : []).map((s, idx) => ({
-        ...s,
-        id: s.id || `stage_${Date.now()}_${idx}`,
-      })),
+      clarificationRequired: false,
+      plan: {
+        ...p,
+        stages: (Array.isArray(p.stages) ? p.stages : []).map((s, idx) => ({
+          ...s,
+          id: s.id || `stage_${Date.now()}_${idx}`,
+        })),
+      },
+      qualityReport: data.qualityReport,
     };
   });
 }

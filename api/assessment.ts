@@ -1,4 +1,5 @@
 import { formatErrorResponse, generateRebAssessment } from '../server/aiService.js';
+import { checkAiMaintenanceMode, recordActivity } from '../server/adminService.js';
 import { ApiRequest, ApiResponse, parseRequestBody, withApiErrorHandler } from './_utils.js';
 
 export default withApiErrorHandler<ApiRequest, ApiResponse>(
@@ -16,6 +17,20 @@ export default withApiErrorHandler<ApiRequest, ApiResponse>(
         status: 405,
         message: 'Method not allowed',
         error: 'Method not allowed',
+        route: '/api/assessment',
+      });
+      return;
+    }
+
+    const maintenance = await checkAiMaintenanceMode();
+    if (maintenance.blocked) {
+      res.status(503).json({
+        status: 503,
+        code: 'MAINTENANCE_MODE',
+        maintenanceMode: true,
+        title: maintenance.title,
+        message: `${maintenance.title}. ${maintenance.message}`,
+        error: `${maintenance.title}. ${maintenance.message}`,
         route: '/api/assessment',
       });
       return;
@@ -56,6 +71,13 @@ export default withApiErrorHandler<ApiRequest, ApiResponse>(
       type: typeof body.type === 'string' ? body.type : undefined,
     });
 
+    await recordActivity(
+      'assessment',
+      subject,
+      classLevel,
+      typeof body.language === 'string' ? body.language : 'en',
+      `Generated assessment for ${subject} (${classLevel})`
+    );
     res.status(200).json({ assessment });
   }
 );

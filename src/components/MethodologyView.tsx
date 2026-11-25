@@ -21,6 +21,7 @@ import {
   printOrDownloadHtml,
 } from '../utils/export';
 import { AiClientError, requestMethodology } from '../services/aiClient';
+import { MaintenanceNotice } from './MaintenanceNotice';
 
 const RWANDA_CLASSES = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6'];
 
@@ -35,6 +36,8 @@ interface MethodologyViewProps {
   lang: Lang;
   history: SavedMethodology[];
   prefill?: MethodologyPrefill | null;
+  maintenanceMode?: boolean;
+  onBackHome?: () => void;
   onSaveHistory: (next: SavedMethodology[]) => void;
   onToast: (msg: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
   onCopy: (text: string) => void;
@@ -44,6 +47,8 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
   lang,
   history,
   prefill,
+  maintenanceMode = false,
+  onBackHome,
   onSaveHistory,
   onToast,
   onCopy,
@@ -88,6 +93,12 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
   };
 
   const handleGenerate = async () => {
+    if (maintenanceMode) {
+      const msg = 'GHAD AI is currently in maintenance mode. Generating new methodology guides is temporarily paused.';
+      setErrorMsg(msg);
+      onToast(msg, 'warning');
+      return;
+    }
     if (!subject.trim() || !classLevel.trim() || !topic.trim()) {
       const msg = t('toast_fill');
       setErrorMsg(msg);
@@ -186,6 +197,10 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
         </p>
       </div>
 
+      {maintenanceMode && (
+        <MaintenanceNotice variant="workspace" onReturnHome={onBackHome} />
+      )}
+
       <form
         id="methodologyForm"
         className="no-print holo-glass holo-reticle p-6 rounded-2xl border border-[#38bdf8]/30 space-y-4"
@@ -268,7 +283,7 @@ export const MethodologyView: React.FC<MethodologyViewProps> = ({
           <button
             id="generateMethodology"
             type="submit"
-            disabled={loading}
+            disabled={loading || maintenanceMode}
             className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-[#15803D] hover:bg-[#166534] disabled:opacity-60 disabled:cursor-not-allowed rounded-xl transition-colors cursor-pointer whitespace-nowrap"
           >
             {loading ? (

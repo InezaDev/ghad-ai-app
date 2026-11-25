@@ -17,19 +17,22 @@ import {
   User,
   Wrench,
 } from 'lucide-react';
-import { Lang } from '../types/ghad';
+import { DeveloperProfile, Lang } from '../types/ghad';
 import { translate } from '../i18n/translations';
 
 interface AdminDashboardViewProps {
   lang: Lang;
   onToast: (msg: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
   onBack: () => void;
+  onSettingsUpdated?: () => void;
 }
 
-export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ lang, onToast, onBack }) => {
+export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ lang, onToast, onBack, onSettingsUpdated }) => {
   const t = (k: string) => translate(lang, k);
-  const [token, setToken] = useState<string>(() => localStorage.getItem('ghad_admin_token') || '');
+  const [token, setToken] = useState<string>('');
+  const [authConfigured, setAuthConfigured] = useState<boolean | null>(null);
   const [passwordInput, setPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'settings' | 'analytics' | 'logs' | 'feedback' | 'developer'>('settings');
 
@@ -43,7 +46,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ lang, on
     toolMethodology: true,
   });
 
-  const [developer, setDeveloper] = useState({
+  const [developer, setDeveloper] = useState<DeveloperProfile>({
     name: '',
     title: '',
     school: '',
@@ -52,7 +55,10 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ lang, on
     phone: '',
     email: '',
     github: '',
+    localizedTitles: {},
+    localizedBios: {},
   });
+  const [devEditLang, setDevEditLang] = useState<Lang>('en');
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -98,20 +104,66 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ lang, on
   const [logs, setLogs] = useState<Array<{ id: string; tool: string; subject: string; classLevel: string; language: string; summary: string; timestamp: string }>>([]);
   const [feedbacks, setFeedbacks] = useState<Array<{ id: string; name: string; email: string; message: string; createdAt: string }>>([]);
 
+  useEffect(() => {
+    let active = true;
+    fetch('/api/admin/auth')
+      .then((res) => (res.ok ? res.json() : { configured: true }))
+      .then((data: { configured?: boolean }) => {
+        if (active) setAuthConfigured(Boolean(data?.configured ?? true));
+      })
+      .catch(() => {
+        if (active) setAuthConfigured(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authConfigured === false) {
+      if (passwordInput.trim().length < 8) {
+        onToast('Administrator password must be at least 8 characters long.', 'error');
+        return;
+      }
+      if (passwordInput !== confirmPasswordInput) {
+        onToast('Passwords do not match. Please confirm your password.', 'error');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
+      const payload =
+        authConfigured === false
+          ? { action: 'setup', password: passwordInput }
+          : { password: passwordInput };
       const res = await fetch('/api/admin/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: passwordInput }),
+        body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const text = await res.text();
+      let data: { success?: boolean; token?: string; error?: string; needsSetup?: boolean } = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = { error: `Server returned status ${res.status}` };
+      }
+      if (data.needsSetup) {
+        setAuthConfigured(false);
+      }
+      if (res.ok && data.success && data.token) {
+        setAuthConfigured(true);
+        setPasswordInput('');
+        setConfirmPasswordInput('');
         setToken(data.token);
-        localStorage.setItem('ghad_admin_token', data.token);
-        onToast('Admin authenticated successfully', 'success');
+        onToast(
+          authConfigured === false
+            ? 'Administrator password created and signed in.'
+            : 'Admin authenticated successfully',
+          'success'
+        );
         fetchAdminData(data.token);
       } else {
         onToast(data.error || 'Invalid admin password', 'error');
@@ -134,6 +186,12 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ lang, on
         fetch('/api/admin/feedback', { headers }),
         fetch('/api/admin/developer', { headers }),
       ]);
+
+      if ([setRes, statsRes, logsRes, fbRes, devRes].some((r) => r.status === 401)) {
+        setToken('');
+        onToast('Admin session expired. Please sign in again.', 'warning');
+        return;
+      }
 
       if (setRes.ok) setSettings(await setRes.json());
       if (statsRes.ok) setStats(await statsRes.json());
@@ -163,6 +221,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ lang, on
       });
       if (res.ok) {
         onToast('Site settings updated permanently in Redis!', 'success');
+        onSettingsUpdated?.();
       } else {
         onToast('Failed to update settings', 'error');
       }
@@ -183,6 +242,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ lang, on
       });
       if (res.ok) {
         onToast('Developer profile updated permanently in Redis!', 'success');
+        onSettingsUpdated?.();
       } else {
         onToast('Failed to update developer profile', 'error');
       }
@@ -216,31 +276,53 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ lang, on
             <Lock className="w-8 h-8" />
           </div>
           <h2 className="font-display text-2xl font-bold text-[var(--text)]">GHAD AI Admin Portal</h2>
-          <p className="text-sm text-[var(--muted)]">Enter your administrator password to manage site settings, analytics, and Redis persistence.</p>
+          <p className="text-sm text-[var(--muted)]">
+            {authConfigured === false
+              ? 'First-time setup: create a strong administrator password (at least 8 characters) to secure site settings and maintenance controls.'
+              : 'Enter your administrator password to manage site settings, analytics, and persistence.'}
+          </p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">
-              Admin Password
+              {authConfigured === false ? 'Create Admin Password' : 'Admin Password'}
             </label>
             <input
               type="password"
               value={passwordInput}
               onChange={(e) => setPasswordInput(e.target.value)}
-              placeholder="Enter admin password (default: ghad_admin_2026)"
+              placeholder={authConfigured === false ? 'Minimum 8 characters' : 'Enter administrator password'}
+              minLength={authConfigured === false ? 8 : 1}
               className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--primary)]"
               required
             />
           </div>
 
+          {authConfigured === false && (
+            <div>
+              <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">
+                Confirm Admin Password
+              </label>
+              <input
+                type="password"
+                value={confirmPasswordInput}
+                onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                placeholder="Re-enter administrator password"
+                minLength={8}
+                className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--primary)]"
+                required
+              />
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={loading}
-            className="w-full py-3 rounded-xl bg-[var(--primary)] text-white font-semibold shadow-md hover:opacity-95 transition flex items-center justify-center gap-2 cursor-pointer"
+            disabled={loading || authConfigured === null}
+            className="w-full py-3 rounded-xl bg-[var(--primary)] text-white font-semibold shadow-md hover:opacity-95 disabled:opacity-60 transition flex items-center justify-center gap-2 cursor-pointer"
           >
             {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
-            <span>Access Admin Dashboard</span>
+            <span>{authConfigured === false ? 'Save Password & Open Admin' : 'Access Admin Dashboard'}</span>
           </button>
         </form>
 
@@ -280,7 +362,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ lang, on
           <button
             onClick={() => {
               setToken('');
-              localStorage.removeItem('ghad_admin_token');
+              setPasswordInput('');
             }}
             className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-500/20 transition flex items-center gap-2 cursor-pointer"
           >
@@ -577,15 +659,48 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ lang, on
               />
             </div>
 
+            <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-[var(--muted)]">
+                Profile Language Version (Role &amp; Bio):
+              </span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(['en', 'rw', 'fr', 'sw'] as const).map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => setDevEditLang(code)}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                      devEditLang === code
+                        ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
+                        : 'bg-[var(--surface)] text-[var(--text)] border-[var(--border)] hover:border-[var(--primary)]'
+                    }`}
+                  >
+                    {code === 'en' ? 'English' : code === 'rw' ? 'Ikinyarwanda' : code === 'fr' ? 'Français' : 'Kiswahili'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">
-                Role / Title
+                Role / Title ({devEditLang.toUpperCase()})
               </label>
               <input
                 type="text"
-                value={developer.title}
-                onChange={(e) => setDeveloper({ ...developer, title: e.target.value })}
-                placeholder="e.g. Creator of GHAD AI · Educator & EdTech Developer in Rwanda"
+                value={
+                  devEditLang === 'en'
+                    ? developer.localizedTitles?.en ?? developer.title
+                    : developer.localizedTitles?.[devEditLang] ?? translate(devEditLang, 'dev_default_title')
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDeveloper((prev) => ({
+                    ...prev,
+                    ...(devEditLang === 'en' ? { title: val } : {}),
+                    localizedTitles: { ...(prev.localizedTitles || {}), [devEditLang]: val },
+                  }));
+                }}
+                placeholder={translate(devEditLang, 'dev_default_title')}
                 className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm"
               />
             </div>
@@ -598,19 +713,30 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ lang, on
                 type="text"
                 value={developer.school}
                 onChange={(e) => setDeveloper({ ...developer, school: e.target.value })}
-                placeholder="e.g. G.S. Saint Etienne"
+                placeholder="e.g. TTC Muhanga"
                 className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">
-                Bio / About Text
+                Bio / About Text ({devEditLang.toUpperCase()})
               </label>
               <textarea
                 rows={4}
-                value={developer.bio}
-                onChange={(e) => setDeveloper({ ...developer, bio: e.target.value })}
+                value={
+                  devEditLang === 'en'
+                    ? developer.localizedBios?.en ?? developer.bio
+                    : developer.localizedBios?.[devEditLang] ?? translate(devEditLang, 'dev_default_bio')
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDeveloper((prev) => ({
+                    ...prev,
+                    ...(devEditLang === 'en' ? { bio: val } : {}),
+                    localizedBios: { ...(prev.localizedBios || {}), [devEditLang]: val },
+                  }));
+                }}
                 placeholder="Share your developer story and mission for Rwandan education..."
                 className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm resize-y"
               />
@@ -624,7 +750,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ lang, on
                 type="text"
                 value={developer.phone}
                 onChange={(e) => setDeveloper({ ...developer, phone: e.target.value })}
-                placeholder="e.g. +250 788 123 456 (Enables WhatsApp & Call buttons)"
+                placeholder="e.g. +250 783262573 (Enables WhatsApp & Call buttons)"
                 className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm"
               />
             </div>
@@ -637,7 +763,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ lang, on
                 type="email"
                 value={developer.email}
                 onChange={(e) => setDeveloper({ ...developer, email: e.target.value })}
-                placeholder="e.g. nkurikiyineza@ghadai.rw"
+                placeholder="e.g. inezaghad250@gmail.com"
                 className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm"
               />
             </div>

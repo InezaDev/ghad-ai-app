@@ -1,4 +1,5 @@
 import { ExistingLessonDraft, formatErrorResponse, generateRebLessonPlan } from '../server/aiService.js';
+import { checkAiMaintenanceMode, recordActivity } from '../server/adminService.js';
 import { ApiRequest, ApiResponse, parseRequestBody, withApiErrorHandler } from './_utils.js';
 
 export default withApiErrorHandler<ApiRequest, ApiResponse>(
@@ -16,6 +17,20 @@ export default withApiErrorHandler<ApiRequest, ApiResponse>(
         status: 405,
         message: 'Method not allowed',
         error: 'Method not allowed',
+        route: '/api/lesson',
+      });
+      return;
+    }
+
+    const maintenance = await checkAiMaintenanceMode();
+    if (maintenance.blocked) {
+      res.status(503).json({
+        status: 503,
+        code: 'MAINTENANCE_MODE',
+        maintenanceMode: true,
+        title: maintenance.title,
+        message: `${maintenance.title}. ${maintenance.message}`,
+        error: `${maintenance.title}. ${maintenance.message}`,
         route: '/api/lesson',
       });
       return;
@@ -63,7 +78,7 @@ export default withApiErrorHandler<ApiRequest, ApiResponse>(
       return;
     }
 
-    const plan = await generateRebLessonPlan({
+    const result = await generateRebLessonPlan({
       language: typeof body.language === 'string' ? body.language : undefined,
       subject,
       classLevel,
@@ -80,10 +95,26 @@ export default withApiErrorHandler<ApiRequest, ApiResponse>(
       teacherName: typeof body.teacherName === 'string' ? body.teacherName : undefined,
       extra: typeof body.extra === 'string' ? body.extra : undefined,
       mode: body.mode === 'complete_missing' ? 'complete_missing' : 'generate',
+      confirmOverride: Boolean(body.confirmOverride),
       existingPlan,
     });
 
-    res.status(200).json({ plan });
+    if (result.clarificationRequired) {
+      res.status(200).json({
+        clarificationRequired: true,
+        clarification: result.clarification,
+      });
+      return;
+    }
+
+    await recordActivity(
+      'lesson',
+      subject,
+      classLevel,
+      typeof body.language === 'string' ? body.language : 'en',
+      `Generated lesson plan for ${subject} (${classLevel})`
+    );
+    res.status(200).json({ plan: result.plan, qualityReport: result.qualityReport });
   }
 );
 

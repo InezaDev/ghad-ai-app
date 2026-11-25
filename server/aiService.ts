@@ -1,5 +1,17 @@
 import dotenv from 'dotenv';
 import { GenerateContentParameters, GoogleGenAI, Type } from '@google/genai';
+import {
+  LessonClarification,
+  LessonQualityReport,
+  NormalizedLessonPlan,
+  buildPostLessonReflectionGuide,
+  buildSenAdaptationProfile,
+  checkLessonConsistency,
+  getCurriculumGroundingContext,
+  hasInventedAssessmentResults,
+  runLessonQualityCheckAndRepair,
+  sanitizeLanguageQuality,
+} from './lessonQuality.js';
 
 dotenv.config();
 
@@ -10,9 +22,11 @@ const RATE_LIMIT_RETRY_DELAY_MS = 2500;
 
 export class AiServiceHttpError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -306,7 +320,7 @@ export function normalizeError(err: unknown): NormalizedAiError {
     return {
       status: err.status,
       message: redactPotentialSecrets(err.message),
-      code: err.status === 503 ? 'GEMINI_UNAVAILABLE' : 'AI_SERVICE_ERROR',
+      code: err.code || (err.status === 503 ? 'GEMINI_UNAVAILABLE' : 'AI_SERVICE_ERROR'),
     };
   }
 
@@ -645,22 +659,23 @@ export interface GenerateLessonInput {
   teacherName?: string;
   extra?: string;
   mode?: 'generate' | 'complete_missing';
+  confirmOverride?: boolean;
   existingPlan?: ExistingLessonDraft;
 }
 
+export type GenerateLessonResult =
+  | {
+      clarificationRequired: true;
+      clarification: LessonClarification;
+    }
+  | {
+      clarificationRequired: false;
+      plan: NormalizedLessonPlan;
+      qualityReport: LessonQualityReport;
+    };
+
 export function sanitizeTextPurity(text: string, lang: SupportedLang): string {
-  if (!text) return '';
-  // Strip non-Latin foreign scripts (Chinese, Japanese, Korean, Cyrillic, etc.)
-  let cleaned = text.replace(
-    /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\u0400-\u04ff]/g,
-    ''
-  );
-  if (lang === 'rw') {
-    // Strip digits stuck inside words like "is2omo" -> "isomo", "ba4za" -> "baza"
-    cleaned = cleaned.replace(/([a-zA-ZÀ-ÿ])\d+([a-zA-ZÀ-ÿ])/g, '$1$2');
-    cleaned = cleaned.replace(/\bkumyumva\b/gi, 'kuwumva');
-  }
-  return cleaned;
+  return sanitizeLanguageQuality(text, lang);
 }
 
 function cleanActionText(raw: string): string {
@@ -703,12 +718,17 @@ function ensureNumberedActions(raw: string): string {
   return /^\d+[.)]\s+/.test(cleaned) ? cleaned : `1. ${cleaned}`;
 }
 
-export async function generateRebLessonPlan(input: GenerateLessonInput) {
+export async function generateRebLessonPlan(
+  input: GenerateLessonInput
+): Promise<GenerateLessonResult> {
   const existing = input.existingPlan;
 
   const subjectInput = String(input.subject || existing?.subject || '').trim();
   const classInput = String(input.classLevel || existing?.classLevel || '').trim();
-  const rawTopicInput = String(input.topic || existing?.lessonTitle || '').trim();
+  const rawTopicInput = sanitizeLanguageQuality(
+    String(input.topic || existing?.lessonTitle || '').trim(),
+    resolveLang(input.language)
+  );
   const unitNoInput = String(input.unitNo || existing?.unitNo || '1').trim();
   const unitTitleInput = String(input.unitTitle || existing?.unitTitle || '').trim();
   const lessonNoInput = String(input.lessonNo || existing?.lessonNo || '1 of 4').trim();
@@ -722,7 +742,36 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
   });
   const cbc = CBC_LOCALIZATION[lang];
   const hasPartialDraft = Boolean(existing && (existing.unitTitle || existing.stages?.length));
-  const topicDescriptor = rawTopicInput || unitTitleInput || `Unit ${unitNoInput} Lesson ${lessonNoInput}`;
+
+  if (!input.confirmOverride) {
+    const consistency = checkLessonConsistency({
+      subject: subjectInput,
+      classLevel: classInput,
+      topic: rawTopicInput,
+      unitTitle: unitTitleInput,
+      lang,
+    });
+    if (!consistency.consistent) {
+      return {
+        clarificationRequired: true,
+        clarification: consistency.clarification,
+      };
+    }
+  }
+
+  const curriculumGrounding = getCurriculumGroundingContext({
+    subject: subjectInput,
+    classLevel: classInput,
+    unitNo: unitNoInput,
+    topic: rawTopicInput,
+    lang,
+  });
+
+  const topicDescriptor =
+    rawTopicInput ||
+    curriculumGrounding.matchedUnit?.sampleTopics[0] ||
+    unitTitleInput ||
+    `Unit ${unitNoInput} Lesson ${lessonNoInput}`;
 
   const defaultSenByLang: Record<SupportedLang, string> = {
     en: 'Slow learners (2), Mild visual impairment (1)',
@@ -731,6 +780,7 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
     sw: 'Wanafunzi wanaojifunza polepole (2), Ulemavu mdogo wa macho (1)',
   };
   const senInput = String(input.sen || existing?.sen || defaultSenByLang[lang]).trim();
+  const senProfile = buildSenAdaptationProfile(senInput, lang);
 
   const targetDuration = Math.max(
     10,
@@ -777,49 +827,65 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
   const systemInstruction = [
     `You are a practical curriculum advisor and master teacher trainer for the ${cbc.curriculumHeader}.`,
     cbc.styleRule,
-    `STRICT LANGUAGE & GRAMMAR RULE: Write EVERY single field strictly in ${cbc.languageName} with accurate, natural grammar. Fix any spelling typos in the teacher's topic or unit input (for example "EQUITY AND EQULITY" -> "Equity and Equality").`,
+    `STRICT LANGUAGE & GRAMMAR RULE: Write EVERY single field strictly in ${cbc.languageName} with accurate, natural grammar and authentic Rwandan educational terminology. Fix spelling typos in topic/unit input (e.g. "EQULITY" -> "Equality").`,
     isKinyarwandaMode
-      ? `KINYARWANDA PURITY & TERMINOLOGY RULE (CRITICAL): Write strictly in standard Kinyarwanda. NEVER insert digits inside words (no 'is2omo', no 'mu1baza') and strictly NO Chinese/Japanese/Cyrillic characters. Use official REB CBC terms: Intego y'isomo, Ubushobozi ngiro, Ubushobozi rusange n'insanganyamatsiko zambukiranya amasomo, Ibikorwa by'umwarimu n'iby'abanyeshuri, Isuzuma ry'umwarimu.`
+      ? `KINYARWANDA PURITY & TERMINOLOGY RULE (CRITICAL): Write strictly in natural, grammatically accurate Kinyarwanda. NEVER insert digits inside words (no 'is2omo', no 'mu1baza'), NEVER mix in Swahili/French words (never 'kujadili', 'mwalimu', 'wanafunzi', 'masomo'—use 'kuganira', 'umwarimu', 'abanyeshuri', 'amasomo'), and strictly NO Chinese/Japanese/Cyrillic characters. Use proper noun-class concord (e.g. 'kuwumva', 'cyo gusoma', 'kugira ngo') and official REB CBC terms: Intego y'isomo, Ubushobozi ngiro, Ubushobozi rusange n'insanganyamatsiko zambukiranya amasomo, Ibikorwa by'umwarimu n'iby'abanyeshuri, Isuzuma ry'umwarimu.`
       : '',
+    `SUBJECT, TOPIC & SINGLE TITLE LOCK (CRITICAL):`,
+    `- Keep the exact Subject "${subjectInput}" and Class "${classInput}". Never silently switch subjects or invent an unrelated topic.`,
+    rawTopicInput
+      ? `- Use ONE clean canonical lessonTitle matching "${rawTopicInput}" consistently across the entire lesson plan. Never produce two different wordings of the lesson title.`
+      : `- Write ONE clear, concise lessonTitle strictly aligned to ${subjectInput} (${classInput}) and keep that exact title consistent everywhere.`,
+    `CURRICULUM GROUNDING & NO-FABRICATION RULE: ${curriculumGrounding.promptNote}`,
     `TIMING & TIMESTAMP RULE (STRICT): Timestamps belong ONLY in the timing column (e.g. "Introduction — 5'", "Development (Body) — 30'", "Conclusion — 5'"). NEVER put minute ranges, time intervals, or brackets (such as "[0-10']", "[10-22']", or "(5 mins)") inside individual "teacherActivities" or "learnerActivities" text!`,
     `AUTO-COMPLETE RULE: Teachers often enter only Identification fields or a partial draft. Complete EVERY SINGLE field so there are ZERO blank sections.`,
     hasPartialDraft
       ? `PRESERVE & COMPLETE MODE: Keep complete teacher-provided fields, and richly write every field marked [MISSING - AI MUST WRITE].`
       : '',
-    `DYNAMIC TOPIC-SPECIFICITY RULE (CRITICAL): Adapt EVERY section specifically to Subject "${subjectInput}", Grade "${classInput}", and Topic "${rawTopicInput || unitTitleInput || `Unit ${unitNoInput} Lesson ${lessonNoInput}`}". NEVER repeat generic boilerplate. Include real classroom examples, actual questions to ask students, concrete subject teaching aids, and realistic exercises matched to ${classInput} age and ability.`,
+    `DYNAMIC TOPIC-SPECIFICITY & NON-REPETITION RULE (CRITICAL):`,
+    `- Adapt EVERY section specifically to Subject "${subjectInput}", Grade "${classInput}", and Topic "${topicDescriptor}".`,
+    `- NEVER repeat identical activities across Introduction, Development, and Conclusion, and NEVER copy-paste boilerplate sentences within a stage.`,
+    `- Every activity and exit assessment question MUST directly practice and measure the stated instructionalObjective.`,
+    `PRACTICAL SEN ADAPTATION RULE (CRITICAL — TEACHER SPECIFIED "${senInput}"):`,
+    `- Tailor "planLocation", "learningMaterials", and stage actions specifically to "${senInput}".`,
+    senProfile.hasSpecificNeeds
+      ? `- Required concrete SEN supports to integrate naturally: Location (${senProfile.locationNote}); Materials (${senProfile.materialsNote}); Teacher support (${senProfile.classroomSupportStep}).`
+      : `- No specific disability was listed ("${senInput}"), so apply universal inclusive classroom practices without inventing unrequested disabilities.`,
     `DYNAMIC COMPETENCES & CROSS-CUTTING ISSUES RULE (CRITICAL):`,
     `- Available REB Generic Competences: ${cbc.competencesList}`,
     `- Available REB Cross-Cutting Issues: ${cbc.crossCuttingList}`,
-    `- NEVER repeat the exact same generic competences or cross-cutting issues on every lesson. Choose ONLY the 2–3 Generic Competences and 1–2 Cross-Cutting Issues that naturally fit THIS exact lesson topic ("${rawTopicInput || unitTitleInput || subjectInput}") and explain clearly in 1 short sentence HOW learners practice them during that stage (for example: Financial education for Entrepreneurship/Money math; Environment and sustainability for Biology/Geography/SET; Peace and values / Genocide studies for History/SRE; Standardization culture for Chemistry/Physics measurements; Creativity & Communication for Language writing/speaking).`,
+    `- Choose ONLY 2–3 Generic Competences and 1–2 Cross-Cutting Issues that naturally fit "${topicDescriptor}" and explain in 1 short sentence HOW learners practice them during each stage.`,
     `EXACT OFFICIAL REB SECTION RULES:`,
     `1. "schoolName": Keep "${schoolInput || 'GS Kigali'}" if given, else "GS Kigali".`,
     `2. "teacherName": Keep "${teacherInput || 'Teacher'}" if given, else "Teacher".`,
-    `3. "unitNo": "${unitNoInput}".`,
-    `4. "unitTitle": Official REB unit title for ${subjectInput} ${classInput}.`,
-    `5. "lessonNo": "${lessonNoInput}".`,
-    `6. "sen": "${senInput}".`,
-    `7. "keyUnitCompetence": Official unit competence in clear ${cbc.languageName}.`,
-    `8. "lessonTitle": Clear, correctly spelled lesson title in ${cbc.languageName}.`,
-    `9. "instructionalObjective": ${cbc.objectiveGuidance}`,
-    `10. "planLocation": Location and seating/grouping arrangement in ${cbc.languageName}.`,
-    `11. "learningMaterials": Real, low-cost, topic-specific teaching aids for all learners (including SEN adaptations) in ${cbc.languageName}.`,
-    `12. "references": Specific REB syllabus, Teacher's Guide, and Learner's Book for ${subjectInput} ${classInput}.`,
-    `13. "activityOverview": 1–2 simple sentences describing how learners learn "${rawTopicInput || unitTitleInput}" actively.`,
-    `14. "stages": MUST contain EXACTLY 3 stages (or match existing stage rows if >3):`,
+    `3. "subject": MUST be "${subjectInput}".`,
+    `4. "classLevel": MUST be "${classInput}".`,
+    `5. "unitNo": "${unitNoInput}".`,
+    `6. "unitTitle": Accurate REB unit title for ${subjectInput} ${classInput}${curriculumGrounding.matchedUnit ? ` ("${curriculumGrounding.matchedUnit.unitTitle}")` : ''}.`,
+    `7. "lessonNo": "${lessonNoInput}".`,
+    `8. "sen": "${senInput}".`,
+    `9. "keyUnitCompetence": Official unit competence in clear ${cbc.languageName}.`,
+    `10. "lessonTitle": ONE clean, correctly spelled lesson title in ${cbc.languageName}.`,
+    `11. "instructionalObjective": ${cbc.objectiveGuidance}`,
+    `12. "planLocation": Seating/grouping arrangement tailored to "${senInput}" in ${cbc.languageName}.`,
+    `13. "learningMaterials": Real, low-cost, topic-specific teaching aids including specific adaptations for "${senInput}" in ${cbc.languageName}.`,
+    `14. "references": Accurate REB syllabus / Teacher's Guide / Learner's Book reference for ${subjectInput} ${classInput} (indicate verification on elearning.reb.rw if exact unit text is not verified).`,
+    `15. "activityOverview": 1–2 simple sentences describing how learners learn "${topicDescriptor}" actively and how understanding will be checked.`,
+    `16. "stages": MUST contain EXACTLY 3 distinct, non-repetitive stages:`,
     `    - Stage 1 (stageType: "intro", stageName: "${cbc.introName}", timingMinutes: ${introMin}):`,
-    `      * teacherActivities: MUST have 4–5 detailed, numbered steps ("1. ...", "2. ...", "3. ...", "4. ...") on separate lines without timestamps. Greet learners, check SEN seating, ask 2 concrete diagnostic review questions on prerequisite knowledge, introduce the lesson title and state the specific competence objective clearly.`,
-    `      * learnerActivities: Matching 4–5 numbered steps ("1. ...", "2. ...", "3. ...", "4. ...") describing active student responses.`,
-    `      * competencesAndIssues: Pick topic-matched Generic Competence + Cross-Cutting Issue and explain how it happens in Introduction.`,
+    `      * teacherActivities: 4–5 distinct numbered steps without timestamps: greet learners, apply SEN seating/check-in, ask 2 concrete diagnostic questions on prior knowledge, introduce "${topicDescriptor}", and state the instructional objective clearly.`,
+    `      * learnerActivities: Matching 4–5 numbered steps describing active learner responses.`,
+    `      * competencesAndIssues: Topic-matched Generic Competence + Cross-Cutting Issue and how it occurs in Introduction.`,
     `    - Stage 2 (stageType: "development", stageName: "${cbc.devName}", timingMinutes: ${devMin}):`,
-    `      * teacherActivities: MUST have 6–8 detailed, learner-centred numbered steps ("1. ...", ..., "6. ...", "7. ...", "8. ...") on separate lines tailored to "${rawTopicInput || unitTitleInput}" in ${subjectInput} (${classInput}). Walk through structured group discovery with concrete materials, guiding questions, peer presentation, teacher clarification/chalkboard summary, paired problem-solving, and differentiated support. NEVER repeat the lesson title in quotes ("..."). NEVER include minute tags (like [0-10']). Include actual questions to ask students and concrete teaching aids.`,
-    `      * learnerActivities: Matching 6–8 numbered steps ("1. ...", "2. ...", "3. ...", "4. ...", "5. ...", "6. ...") describing active group collaboration, discussion, presenting findings, writing confirmed summaries, and paired practice.`,
-    `      * competencesAndIssues: Pick 1–2 NEW topic-specific Generic Competences + Cross-Cutting Issues and state clearly how learners apply them in Development.`,
+    `      * teacherActivities: 6–7 varied, objective-aligned numbered steps for "${topicDescriptor}" in ${subjectInput} (${classInput}): structured group discovery with real aids, guiding questions, group presentations, clear board summary, guided paired practice, and targeted SEN scaffolding (${senInput}). NEVER include minute tags (like [0-10']).`,
+    `      * learnerActivities: Matching 6–7 numbered steps showing active collaboration, manipulation of aids, presentation, note-taking, and paired practice.`,
+    `      * competencesAndIssues: Distinct Generic Competences + Cross-Cutting Issues applied in Development.`,
     `    - Stage 3 (stageType: "conclusion", stageName: "${cbc.conclName}", timingMinutes: ${conclMin}):`,
-    `      * teacherActivities: MUST have 3–4 detailed numbered steps ("1. ...", "2. ...", "3. ...") on separate lines without timestamps — guide learners to summarize main takeaways of "${rawTopicInput || unitTitleInput}", ask 2–3 specific oral/written exit check questions to verify goal mastery, and give constructive summary feedback.`,
-    `      * learnerActivities: Matching 3–4 numbered steps ("1. ...", "2. ...", "3. ...") — share key takeaways in own words, answer exit questions independently, and note personal learning goals.`,
+    `      * teacherActivities: 3–4 numbered steps without timestamps — guide learner summary of "${topicDescriptor}", specify the Formative Assessment Method (2–3 concrete exit check questions/tasks aligned directly with the instructional objective), and explain how results will guide next-lesson follow-up.`,
+    `      * learnerActivities: Matching 3–4 numbered steps — summarize takeaways in own words, complete the exit check task independently, and note personal focus areas.`,
     `      * competencesAndIssues: Topic-relevant Generic Competence & Cross-Cutting Issue + short explanation.`,
-    `15. "teacherSelfEvaluation": Simple, practical post-lesson reflection line aligned to the lesson objective and ${targetDuration} minutes.`,
-    `COMPLETENESS & TIMING RULE: Fill EVERY field 100% in ${cbc.languageName}. Never output blank strings or "N/A". Total stage minutes MUST equal ${targetDuration}.`,
+    `17. "teacherSelfEvaluation": NEVER invent mastery percentages (like "85%" or "95%"), NEVER invent student pass/fail counts, and NEVER write past-tense claims that the lesson was already taught! Instead, write a practical 2–3 sentence **Post-Lesson Reflection Guide (To be completed by the teacher after teaching)** in ${cbc.languageName} telling the teacher what evidence to record after teaching (exit-check mastery count, effectiveness of methods/aids and SEN adaptations, and remedial/extension follow-up). NEVER use blank underscores like "___%".`,
+    `COMPLETENESS & TIMING RULE: Fill EVERY field 100% in ${cbc.languageName}. Never output blank strings, placeholder underscores ("___"), invented student percentages, or "N/A". Total stage minutes MUST equal ${targetDuration}.`,
   ]
     .filter(Boolean)
     .join('\n');
@@ -832,15 +898,16 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
     `- Teacher Name: ${teacherInput || 'Teacher'}`,
     `- Term: ${localizedTerm}`,
     `- Date: ${dateInput}`,
-    `- Subject (write in ${cbc.languageName} if needed): ${subjectInput}`,
-    `- Class & Level Band: ${levelContext}`,
+    `- Subject (LOCKED — do NOT change): ${subjectInput}`,
+    `- Class & Level Band (LOCKED): ${levelContext}`,
     `- Unit No.: ${unitNoInput}`,
-    `- Unit Title: ${unitTitleInput || `[Infer accurate REB ${subjectInput} ${classInput} Unit ${unitNoInput} title]`}`,
+    `- Unit Title: ${unitTitleInput || curriculumGrounding.matchedUnit?.unitTitle || `[Align with REB ${subjectInput} ${classInput} Unit ${unitNoInput}; mark reference for verification if exact title is unconfirmed]`}`,
     `- Lesson No.: ${lessonNoInput}`,
-    `- Lesson Title / Topic: ${topicDescriptor}`,
+    `- Lesson Title / Topic (use ONE consistent title): ${topicDescriptor}`,
+    `- Curriculum Context: ${curriculumGrounding.promptNote}`,
     `- Duration: ${targetDuration} minutes (Introduction: ${introMin} min, Development: ${devMin} min, Conclusion: ${conclMin} min)`,
     `- Class Size: ${classSize} learners`,
-    `- Type of Special Educational Needs & number of learners: ${senInput}`,
+    `- Special Educational Needs (tailor adaptations specifically to these needs): ${senInput}`,
     partialRowsSummary ? `\nCurrent Draft Sections:\n${partialRowsSummary}` : '',
     input.extra ? `- Extra Teacher Notes: ${input.extra}` : '',
   ]
@@ -935,15 +1002,19 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
     throw new AiServiceHttpError(502, 'AI returned a lesson plan without stages. Please click Retry.');
   }
 
-  const finalSubject = pickMeaningful(input.subject, parsed.subject, subjectInput || 'Subject');
-  const finalClass = pickMeaningful(input.classLevel, parsed.classLevel, classInput || 'P4');
-  const finalLessonTitle = pickMeaningful(
-    existing?.lessonTitle,
-    parsed.lessonTitle,
-    rawTopicInput || unitTitleInput || `${finalSubject} Unit ${unitNoInput} Lesson ${lessonNoInput}`
-  );
+  const finalSubject = subjectInput || pickMeaningful(existing?.subject, parsed.subject, 'Subject');
+  const finalClass = classInput || pickMeaningful(existing?.classLevel, parsed.classLevel, 'P4');
+  const finalLessonTitle = rawTopicInput
+    ? sanitizeLanguageQuality(rawTopicInput, lang)
+    : pickMeaningful(
+        existing?.lessonTitle,
+        parsed.lessonTitle,
+        curriculumGrounding.matchedUnit?.sampleTopics[0] ||
+          unitTitleInput ||
+          `${finalSubject} Unit ${unitNoInput} Lesson ${lessonNoInput}`
+      );
   const finalUnitTitle = pickMeaningful(
-    existing?.unitTitle || unitTitleInput,
+    existing?.unitTitle || unitTitleInput || curriculumGrounding.matchedUnit?.unitTitle,
     parsed.unitTitle,
     `${finalSubject} Unit ${unitNoInput}: ${finalLessonTitle}`
   );
@@ -960,7 +1031,7 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
       if (type === 'development') {
         return {
           teacher: `1. Igikorwa mu matsinda: Guha buri tsinda ry'abanyeshuri 5 umwandiko n'amakarita y'isomo kuri ${title}.\n2. Gusaba abanyeshuri gusesengura ibiri ku makarita no kungurana ibitekerezo mu matsinda.\n3. Gutembera mu ishuri ugenzura ko buri munyeshuri arimo gufashwa kandi atanga igitekerezo.\n4. Gutumira abahagarariye amatsinda kumurika ibyo bagezeho ku kibaho mu buryo busobanutse.\n5. Kunoza no gukosora imyandikire n'imvugo, ugashimangira ingingo z'ingenzi zigize ${title}.\n6. Guha abanyeshuri imyitozo 2 yo gusobanura no gukemura ibibazo mu makayi yabo.`,
-          learner: `1. Kwicara mu matsinda y'abanyeshuri 5 no gusesengura amakarita bahawe mu bwubahane.\n2. Kujadili no kungurana ibitekerezo mu matsinda ku bibazo by'ingenzi bya ${title}.\n3. Kwandika imyanzuro n'ibisubizo by'itsinda ku rupapuro rwo kumurika.\n4. Kumurika ibisubizo by'itsinda imbere y'abandi banyeshuri ku kibaho.\n5. Kwandika incamake yemejwe n'umwarimu mu makayi yabo y'isomo.\n6. Gukora imyitozo y'isuzuma mu makayi ku giti cyabo no gukosora amakosa.`,
+          learner: `1. Kwicara mu matsinda y'abanyeshuri 5 no gusesengura amakarita bahawe mu bwubahane.\n2. Kuganira no kungurana ibitekerezo mu matsinda ku bibazo by'ingenzi bya ${title}.\n3. Kwandika imyanzuro n'ibisubizo by'itsinda ku rupapuro rwo kumurika.\n4. Kumurika ibisubizo by'itsinda imbere y'abandi banyeshuri ku kibaho.\n5. Kwandika incamake yemejwe n'umwarimu mu makayi yabo y'isomo.\n6. Gukora imyitozo y'isuzuma mu makayi ku giti cyabo no gukosora amakosa.`,
           comp: `Gutekereza byimbitse n'Ubufatanye: abanyeshuri bafatanya gukemura ibibazo no kungurana ibitekerezo mu matsinda.\nUburinganire n'Amahoro: abahungu n'abakobwa bafatanya kuyobora amatsinda mu bwubahane.`,
         };
       }
@@ -1140,6 +1211,13 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
     }
   }
 
+  const defaultReflection = buildPostLessonReflectionGuide({
+    lang,
+    lessonTitle: finalLessonTitle,
+    durationMinutes: targetDuration,
+    sen: senInput,
+  });
+
   const localizedFallbacks: Record<
     SupportedLang,
     {
@@ -1152,46 +1230,54 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
     }
   > = {
     en: {
-      competence: `To be able to understand and use key ideas of ${finalUnitTitle} in daily ${finalClass} ${finalSubject} tasks.`,
-      objective: `Using visual charts and group work, ${finalClass} students will be able to explain and solve tasks on ${finalLessonTitle} correctly, getting at least 4 out of 5 right.`,
-      materials: `REB ${finalClass} ${finalSubject} Learner’s Book, chalkboard, chalk, large-print cards, and simple charts.`,
-      references: `REB ${finalSubject} Syllabus & Teacher’s Guide for ${finalClass}, Unit ${unitNoInput}.`,
-      overview: `Students learn ${finalLessonTitle} step by step through simple examples, group work, and quick class practice.`,
-      eval: `Lesson on ${finalLessonTitle} was taught in ${targetDuration} minutes. About ___% of students met the goal; extra help will be given to students who need more practice.`,
+      competence:
+        curriculumGrounding.matchedUnit?.keyUnitCompetence ||
+        `To be able to understand and apply key ideas of ${finalUnitTitle} in ${finalClass} ${finalSubject}.`,
+      objective: `Using visual charts and guided group tasks, ${finalClass} learners will be able to explain and solve tasks on ${finalLessonTitle} accurately during the exit check.`,
+      materials: `REB ${finalClass} ${finalSubject} Learner’s Book, chalkboard, chalk, and ${senProfile.materialsNote || 'simple topic charts'}.`,
+      references: curriculumGrounding.referenceText,
+      overview: `Learners explore ${finalLessonTitle} step by step through concrete examples, group tasks, and a short formative exit check.`,
+      eval: defaultReflection,
     },
     rw: {
-      competence: `Gushobora gusobanukirwa no gukoresha ubumenyi bw'ingenzi bwa ${finalUnitTitle} mu buzima busanzwe mu isomo rya ${finalSubject} (${finalClass}).`,
-      objective: `Bakoresheje amafoto n'imyitozo mu matsinda, abanyeshuri ba ${finalClass} bazashobora gusobanura no gukora imyitozo kuri ${finalLessonTitle} neza ku kigero cya byibura 80%.`,
-      materials: `Igitabo cy'umunyeshuri cya REB (${finalSubject} ${finalClass}), ikibaho, ingwa, amakarita yanditse mu nyuguti nini, n'ibikoresho biboneka hafi.`,
-      references: `Integanyanyigisho ya REB n'Igitabo cy'Umwarimu bya ${finalSubject} ${finalClass}, Umutwe wa ${unitNoInput}.`,
-      overview: `Abanyeshuri bariga ${finalLessonTitle} binyuze mu biganiro byo mu matsinda, gukora imyitozo no gufashanya.`,
-      eval: `Isomo rya ${finalLessonTitle} ryatanzwe mu minota ${targetDuration}. Abanyeshuri bagera kuri ___% bageze ku ntego y'isomo; abakeneye ubufasha bazahabwa imyitozo yihariye.`,
+      competence:
+        curriculumGrounding.matchedUnit?.keyUnitCompetence ||
+        `Gushobora gusobanukirwa no gukoresha ubumenyi bw'ingenzi bwa ${finalUnitTitle} mu isomo rya ${finalSubject} (${finalClass}).`,
+      objective: `Bakoresheje imfashanyigisho n'imyitozo mu matsinda, abanyeshuri ba ${finalClass} bazashobora gusobanura no gukora neza imyitozo kuri ${finalLessonTitle}.`,
+      materials: `Igitabo cy'umunyeshuri cya REB (${finalSubject} ${finalClass}), ikibaho, ingwa, n'${senProfile.materialsNote || 'amakarita yanditse neza'}.`,
+      references: curriculumGrounding.referenceText,
+      overview: `Abanyeshuri bariga ${finalLessonTitle} binyuze mu biganiro byo mu matsinda, imyitozo n'isuzuma rigufi.`,
+      eval: defaultReflection,
     },
     fr: {
-      competence: `Être capable de comprendre et d'appliquer les notions clés de ${finalUnitTitle} en ${finalSubject} (${finalClass}).`,
-      objective: `À l'aide de fiches visuelles et du travail en groupe, les apprenants de ${finalClass} seront capables d'expliquer et de résoudre des tâches sur ${finalLessonTitle} avec au moins 80 % de réussite.`,
-      materials: `Manuel de l'élève REB ${finalClass} ${finalSubject}, tableau, craie, cartes en gros caractères et affiches.`,
-      references: `Programme REB & Guide de l'enseignant de ${finalSubject} ${finalClass}, Unité ${unitNoInput}.`,
-      overview: `Les apprenants découvrent ${finalLessonTitle} par l'observation, le travail en petits groupes et des exercices guidés.`,
-      eval: `Leçon sur ${finalLessonTitle} dispensée en ${targetDuration} minutes. Environ ___% des apprenants ont atteint l'objectif ; un soutien ciblé suivra.`,
+      competence:
+        curriculumGrounding.matchedUnit?.keyUnitCompetence ||
+        `Être capable de comprendre et d'appliquer les notions clés de ${finalUnitTitle} en ${finalSubject} (${finalClass}).`,
+      objective: `À l'aide de supports visuels et du travail en groupe, les apprenants de ${finalClass} seront capables d'expliquer et de résoudre des tâches sur ${finalLessonTitle}.`,
+      materials: `Manuel de l'élève REB ${finalClass} ${finalSubject}, tableau, craie, ${senProfile.materialsNote || 'et supports visuels'}.`,
+      references: curriculumGrounding.referenceText,
+      overview: `Les apprenants découvrent ${finalLessonTitle} par l'observation, le travail en petits groupes et une vérification formative finale.`,
+      eval: defaultReflection,
     },
     sw: {
-      competence: `Kuweza kuelewa na kutumia dhana kuu za ${finalUnitTitle} katika somo la ${finalSubject} (${finalClass}).`,
-      objective: `Kwa kutumia chati na kazi za vikundi, wanafunzi wa ${finalClass} wataweza kueleza na kufanya mazoezi ya ${finalLessonTitle} kwa usahihi wa angalau asilimia 80%.`,
-      materials: `Kitabu cha Mwanafunzi cha REB (${finalSubject} ${finalClass}), ubao, chaki, kadi zenye maandishi makubwa na chati.`,
-      references: `Mtaala wa REB na Mwongozo wa Mwalimu wa ${finalSubject} ${finalClass}, Sura ya ${unitNoInput}.`,
-      overview: `Wanafunzi wanajifunza ${finalLessonTitle} kupitia kazi za vikundi, majadiliano na mazoezi mafupi.`,
-      eval: `Somo la ${finalLessonTitle} limefundishwa kwa dakika ${targetDuration}. Takriban asilimia ___% ya wanafunzi walifikia lengo; msaada wa ziada utatolewa kwa wanaohitaji.`,
+      competence:
+        curriculumGrounding.matchedUnit?.keyUnitCompetence ||
+        `Kuweza kuelewa na kutumia dhana kuu za ${finalUnitTitle} katika somo la ${finalSubject} (${finalClass}).`,
+      objective: `Kwa kutumia chati na kazi za vikundi, wanafunzi wa ${finalClass} wataweza kueleza na kufanya mazoezi ya ${finalLessonTitle} kwa usahihi.`,
+      materials: `Kitabu cha Mwanafunzi cha REB (${finalSubject} ${finalClass}), ubao, chaki, ${senProfile.materialsNote || 'na chati za somo'}.`,
+      references: curriculumGrounding.referenceText,
+      overview: `Wanafunzi wanajifunza ${finalLessonTitle} kupitia kazi za vikundi, majadiliano na tathmini fupi ya mwisho.`,
+      eval: defaultReflection,
     },
   };
   const lf = localizedFallbacks[lang];
 
-  return {
+  const draftPlan: NormalizedLessonPlan = {
     schoolName: sanitizeTextPurity(pickMeaningful(schoolInput, parsed.schoolName, 'GS Kigali'), lang),
     teacherName: sanitizeTextPurity(pickMeaningful(teacherInput, parsed.teacherName, 'Teacher'), lang),
     term: sanitizeTextPurity(pickMeaningful(localizedTerm, parsed.term, cbc.termMap['Term 1']), lang),
     date: pickMeaningful(dateInput, parsed.date, new Date().toISOString().slice(0, 10)),
-    subject: sanitizeTextPurity(pickMeaningful(parsed.subject, finalSubject, finalSubject), lang),
+    subject: sanitizeTextPurity(finalSubject, lang),
     classLevel: finalClass,
     unitNo: pickMeaningful(unitNoInput, parsed.unitNo, '1'),
     lessonNo: pickMeaningful(lessonNoInput, parsed.lessonNo, '1 of 4'),
@@ -1217,7 +1303,7 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
       lang
     ),
     planLocation: sanitizeTextPurity(
-      pickMeaningful(existing?.planLocation, parsed.planLocation, cbc.defaultLocation),
+      pickMeaningful(existing?.planLocation, parsed.planLocation, senProfile.locationNote || cbc.defaultLocation),
       lang
     ),
     learningMaterials: sanitizeTextPurity(
@@ -1255,12 +1341,36 @@ export async function generateRebLessonPlan(input: GenerateLessonInput) {
     })),
     teacherSelfEvaluation: sanitizeTextPurity(
       pickMeaningful(
-        existing?.teacherSelfEvaluation,
-        parsed.teacherSelfEvaluation,
+        existing?.teacherSelfEvaluation &&
+          !/_{2,}/.test(existing.teacherSelfEvaluation) &&
+          !hasInventedAssessmentResults(existing.teacherSelfEvaluation)
+          ? existing.teacherSelfEvaluation
+          : undefined,
+        typeof parsed.teacherSelfEvaluation === 'string' &&
+          !/_{2,}/.test(parsed.teacherSelfEvaluation) &&
+          !hasInventedAssessmentResults(parsed.teacherSelfEvaluation)
+          ? parsed.teacherSelfEvaluation
+          : undefined,
         lf.eval
       ),
       lang
     ),
+  };
+
+  const checked = runLessonQualityCheckAndRepair(draftPlan, {
+    requestedSubject: finalSubject,
+    requestedClass: finalClass,
+    requestedTopic: rawTopicInput || undefined,
+    lang,
+    senInput,
+    curriculumVerified: curriculumGrounding.verified,
+    verifiedReference: curriculumGrounding.referenceText,
+  });
+
+  return {
+    clarificationRequired: false,
+    plan: checked.plan,
+    qualityReport: checked.report,
   };
 }
 
