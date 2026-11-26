@@ -633,6 +633,42 @@ export default function App() {
     showToast(t('toast_plan_deleted'), 'info');
   };
 
+  const handleOpenSavedAssessment = (saved: SavedAssessment) => {
+    const rest = assessments.filter((a) => a.id !== saved.id);
+    setAssessments([saved, ...rest]);
+    setInWorkspace(true);
+    setActiveView('assessment');
+    syncAdminUrl('assessment', true);
+  };
+
+  const handlePrintSavedAssessment = (saved: SavedAssessment) => {
+    handleOpenSavedAssessment(saved);
+  };
+
+  const handleDeleteSavedAssessment = (id: string) => {
+    const next = assessments.filter((a) => a.id !== id);
+    handleAssessmentsUpdate(next);
+    showToast(t('assess_deleted'), 'info');
+  };
+
+  const handleOpenSavedMethodology = (saved: SavedMethodology) => {
+    const rest = methodologies.filter((m) => m.id !== saved.id);
+    setMethodologies([saved, ...rest]);
+    setInWorkspace(true);
+    setActiveView('methodology');
+    syncAdminUrl('methodology', true);
+  };
+
+  const handlePrintSavedMethodology = (saved: SavedMethodology) => {
+    handleOpenSavedMethodology(saved);
+  };
+
+  const handleDeleteSavedMethodology = (id: string) => {
+    const next = methodologies.filter((m) => m.id !== id);
+    handleMethodologiesUpdate(next);
+    showToast('Methodology guide deleted.', 'info');
+  };
+
   const handleChatsUpdate = (nextThreads: ChatThread[], nextActiveId: string | null) => {
     const prevIds = new Set(chats.map((c) => c.id));
     const nextIds = new Set(nextThreads.map((c) => c.id));
@@ -1203,10 +1239,18 @@ export default function App() {
               <LibraryView
                 lang={lang}
                 plans={plans}
+                assessments={assessments}
+                methodologies={methodologies}
                 onOpenPlan={handleOpenSavedPlan}
                 onDuplicatePlan={handleDuplicateSavedPlan}
                 onPrintPlan={handlePrintSavedPlan}
                 onDeletePlan={handleDeleteSavedPlan}
+                onOpenAssessment={handleOpenSavedAssessment}
+                onPrintAssessment={handlePrintSavedAssessment}
+                onDeleteAssessment={handleDeleteSavedAssessment}
+                onOpenMethodology={handleOpenSavedMethodology}
+                onPrintMethodology={handlePrintSavedMethodology}
+                onDeleteMethodology={handleDeleteSavedMethodology}
                 onCreateNew={() => switchView('lesson')}
               />
             )}
